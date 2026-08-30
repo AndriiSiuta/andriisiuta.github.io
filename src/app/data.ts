@@ -33,27 +33,16 @@ export const METRICS: Metric[] = [
 
 export const JOBS: Job[] = [
   {
-    company: 'Independent Consultant',
+    company: 'Independent Consultant · Push-Based',
     domain: 'Enterprise · Consulting · EV Platform',
-    role: 'Front-End Architecture Consultant',
-    period: '2026 — present',
+    role: 'Nx Architect · Front-End Architecture Consultant',
+    period: '2024 — present',
     current: true,
     highlights: [
-      'Architectural consulting for front-end platforms: scalability, performance, modern Angular practices',
-      'SSR, monorepo, and CI/CD optimization for large-scale enterprise applications',
+      'Architectural consulting for enterprise front-end platforms: scalability, performance, modern Angular practices',
+      'Architected and scaled Nx monorepo infrastructure across 100+ repositories; CI build times cut 40–60% with distributed caching and affected builds',
+      'Built custom Nx plugins standardizing build, test, and deployment; drove adoption of modern Angular (SSR, Signals, Nx) across teams',
       'AI-assisted engineering: Claude and Codex integrated into development and code-analysis workflows',
-    ],
-  },
-  {
-    company: 'Push-Based',
-    domain: 'Enterprise · Consulting',
-    role: 'Nx Architect',
-    period: '2024 — 2025',
-    highlights: [
-      'Architected and scaled Nx monorepo infrastructure across 100+ repositories',
-      'Cut CI build times by 40–60% with distributed caching and affected builds',
-      'Built custom Nx plugins standardizing build, test, and deployment across teams',
-      'Drove adoption of modern Angular (SSR, Signals, Nx) across multiple teams',
     ],
   },
   {
