@@ -81,13 +81,14 @@ export const JOBS: Job[] = [
   },
   {
     company: 'Intellias',
-    domain: 'Geospatial · Map Platform',
-    role: 'Principal Software Engineer · Team Lead',
-    period: '2021 — 2022',
+    domain: 'Geospatial · Map Product Platform',
+    role: 'Software Engineer → Team Lead → Principal Software Engineer',
+    period: '2019 — 2022',
     highlights: [
-      'Guided architectural decisions across large-scale infrastructure projects',
+      'Grew from Software Engineer to Principal within the company, ending as technical lead across large-scale infrastructure projects',
+      'Greenfield development from concept to implementation: technology selection, module definition, coding standards',
       'Led a team of 5 front-end developers; +30% delivery efficiency',
-      'Mentored engineers on performance, accessibility, and maintainability',
+      'Guided architectural decisions and mentored engineers on performance, accessibility, and maintainability',
     ],
   },
   {
@@ -99,16 +100,6 @@ export const JOBS: Job[] = [
       'Front-end architecture for real-time trading interfaces',
       'Custom Angular components for Mapbox-powered map interactions',
       'Complex UI: infinite scroll, high-interaction elements, rich animations',
-    ],
-  },
-  {
-    company: 'Intellias',
-    domain: 'Geospatial · Map Platform',
-    role: 'Software Engineer',
-    period: '2019',
-    highlights: [
-      'Greenfield development from concept to implementation',
-      'Core architecture: technology selection, module definition, coding standards',
     ],
   },
   {

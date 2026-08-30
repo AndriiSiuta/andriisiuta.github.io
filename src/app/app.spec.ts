@@ -26,6 +26,6 @@ describe('App', () => {
     const fixture = TestBed.createComponent(App);
     fixture.detectChanges();
     const el = fixture.nativeElement as HTMLElement;
-    expect(el.querySelectorAll('.timeline__item').length).toBe(9);
+    expect(el.querySelectorAll('.timeline__item').length).toBe(8);
   });
 });
