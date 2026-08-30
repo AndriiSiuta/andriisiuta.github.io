@@ -2,6 +2,7 @@
   <a class="nav__brand" href="#top">AS<span class="accent">.</span></a>
   <div class="nav__links">
     <a href="#experience">Experience</a>
+    <a href="#ai">AI Engineering</a>
     <a href="#skills">Skills</a>
     <a href="#domains">Domains</a>
     <a href="#contact">Contact</a>
@@ -24,7 +25,8 @@
   <p class="hero__pitch">
     I design and scale front-end platforms — modern Angular, signals-based
     architecture, SSR/SSG, and Nx monorepos serving distributed teams across
-    fintech, Web3, healthcare, and mobility.
+    fintech, Web3, healthcare, and mobility — and build the agentic AI
+    workflows that ship them: harnesses, MCP servers, and CI review agents.
   </p>
 
   <div class="hero__cta">
@@ -73,8 +75,37 @@
   </div>
 </section>
 
+<section class="section" id="ai">
+  <h2 class="section__title"><span class="mono accent">02.</span> AI Engineering</h2>
+  <div class="ai-panel" appReveal>
+    <p class="ai-panel__lead">
+      I treat AI as part of the engineering system, not a chat window: agents work
+      inside a <strong>harness</strong> — rules, roles, integrations, and checks —
+      through a controlled initiation → planning → implementation → validation →
+      completion cycle. Applied daily in enterprise work: CI review agents, AG-UI,
+      and custom MCP servers.
+    </p>
+    <div class="grid grid--ai">
+      @for (p of aiPractices; track p.title) {
+        <div class="card card--domain" appReveal>
+          <span class="card__icon">{{ p.icon }}</span>
+          <h3>{{ p.title }}</h3>
+          <p>{{ p.blurb }}</p>
+        </div>
+      }
+    </div>
+    <a class="capstone" [href]="aiCapstone.url" target="_blank" rel="noopener" appReveal>
+      <span class="capstone__tag mono">capstone</span>
+      <div>
+        <h3>{{ aiCapstone.name }} ↗</h3>
+        <p>{{ aiCapstone.blurb }}</p>
+      </div>
+    </a>
+  </div>
+</section>
+
 <section class="section" id="skills">
-  <h2 class="section__title"><span class="mono accent">02.</span> Skills</h2>
+  <h2 class="section__title"><span class="mono accent">03.</span> Skills</h2>
   <div class="grid grid--skills">
     @for (group of skillGroups; track group.title) {
       <div class="card card--skill" appReveal>
@@ -90,7 +121,7 @@
 </section>
 
 <section class="section" id="domains">
-  <h2 class="section__title"><span class="mono accent">03.</span> Domain expertise</h2>
+  <h2 class="section__title"><span class="mono accent">04.</span> Domain expertise</h2>
   <div class="grid grid--domains">
     @for (d of domains; track d.title) {
       <div class="card card--domain" appReveal>
@@ -103,7 +134,7 @@
 </section>
 
 <section class="section" id="achievements">
-  <h2 class="section__title"><span class="mono accent">04.</span> Key achievements</h2>
+  <h2 class="section__title"><span class="mono accent">05.</span> Key achievements</h2>
   <ul class="achievements" appReveal>
     @for (a of achievements; track a) {
       <li><span class="accent mono">▹</span> {{ a }}</li>
@@ -112,7 +143,16 @@
 </section>
 
 <section class="section section--edu" id="education" appReveal>
-  <h2 class="section__title"><span class="mono accent">05.</span> Education</h2>
+  <h2 class="section__title"><span class="mono accent">06.</span> Education</h2>
+  <div class="certs">
+    @for (c of certifications; track c.name) {
+      <div class="cert" appReveal>
+        <span class="cert__badge mono">CERT · {{ c.year }}</span>
+        <h3>{{ c.name }} — {{ c.issuer }}</h3>
+        <p>{{ c.blurb }}</p>
+      </div>
+    }
+  </div>
   <div class="edu">
     @for (e of education; track e.school) {
       <div class="edu__item">

@@ -415,6 +415,109 @@
   }
 }
 
+/* ---------- AI engineering ---------- */
+
+.ai-panel {
+  position: relative;
+  border: 1px solid transparent;
+  border-radius: 16px;
+  padding: 28px;
+  background:
+    linear-gradient(var(--bg-card), var(--bg-card)) padding-box,
+    linear-gradient(120deg, rgba(240, 6, 11, 0.55), rgba(204, 38, 213, 0.55), rgba(119, 2, 255, 0.55)) border-box;
+}
+
+.ai-panel__lead {
+  max-width: 820px;
+  color: var(--text-dim);
+  margin: 0 0 24px;
+
+  strong {
+    color: var(--pink);
+    font-weight: 600;
+  }
+}
+
+.grid--ai {
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+.capstone {
+  display: flex;
+  gap: 18px;
+  align-items: flex-start;
+  margin-top: 18px;
+  padding: 20px 22px;
+  border-radius: 12px;
+  border: 1px dashed rgba(255, 62, 127, 0.45);
+  background: rgba(255, 62, 127, 0.05);
+  text-decoration: none;
+  transition: border-color 0.25s, background 0.25s;
+
+  &:hover {
+    border-color: var(--pink);
+    background: rgba(255, 62, 127, 0.09);
+  }
+
+  h3 {
+    font-family: var(--font-head);
+    color: var(--heading);
+    font-size: 1.05rem;
+    margin: 0 0 6px;
+  }
+
+  p {
+    color: var(--text-dim);
+    font-size: 0.9rem;
+    margin: 0;
+  }
+}
+
+.capstone__tag {
+  flex-shrink: 0;
+  font-size: 0.72rem;
+  color: var(--pink);
+  border: 1px solid rgba(255, 62, 127, 0.5);
+  border-radius: 999px;
+  padding: 3px 10px;
+  margin-top: 2px;
+}
+
+/* ---------- certifications ---------- */
+
+.certs {
+  margin-bottom: 22px;
+}
+
+.cert {
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--violet);
+  border-radius: 10px;
+  padding: 16px 20px;
+  background: var(--bg-card);
+
+  h3 {
+    font-family: var(--font-head);
+    color: var(--heading);
+    font-size: 1rem;
+    margin: 8px 0 4px;
+  }
+
+  p {
+    color: var(--text-dim);
+    font-size: 0.87rem;
+    margin: 0;
+  }
+}
+
+.cert__badge {
+  font-size: 0.72rem;
+  color: var(--violet);
+  border: 1px solid rgba(168, 85, 247, 0.5);
+  border-radius: 999px;
+  padding: 3px 10px;
+}
+
 /* ---------- domains ---------- */
 
 .card--domain {

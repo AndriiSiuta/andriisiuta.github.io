@@ -162,7 +162,7 @@ export const SKILL_GROUPS: SkillGroup[] = [
   {
     title: 'AI & Agents',
     icon: '🤖',
-    skills: ['Claude · Codex in engineering workflows', 'MCP (Model Context Protocol)', 'Multi-agent development workflows', 'Prompt engineering'],
+    skills: ['Claude · Codex in engineering workflows', 'MCP servers (custom)', 'AG-UI', 'CI verification agents', 'Multi-agent workflows', 'Evals & cost control'],
   },
 ];
 
@@ -175,6 +175,67 @@ export const DOMAINS: DomainCard[] = [
   { icon: '🔋', title: 'Mobility & EV', blurb: 'Scalable front-ends for transport and electric-vehicle platforms' },
   { icon: '🛡️', title: 'Defense / High-Security', blurb: 'Strict performance, reliability, and secure data handling' },
   { icon: '📋', title: 'Insurance', blurb: 'Dynamic form builders and validation engines for policy systems' },
+];
+
+export interface AiPractice {
+  icon: string;
+  title: string;
+  blurb: string;
+}
+
+export const AI_PRACTICES: AiPractice[] = [
+  {
+    icon: '🧭',
+    title: 'AI-harness architecture',
+    blurb:
+      'Design of controlled AI-assisted workflows: project rules, reusable skills, specialized subagents (planner, implementer, reviewer, tester, verifier), and hooks as automatic guardrails',
+  },
+  {
+    icon: '📐',
+    title: 'Spec-Driven Development',
+    blurb:
+      'Features run through a 5-phase pipeline — requirements → spec → plan → implementation → verification — producing merge-ready PRs, not plausible-looking code',
+  },
+  {
+    icon: '🔌',
+    title: 'MCP servers',
+    blurb:
+      'Building custom Model Context Protocol servers that connect agents to GitHub, issue trackers, APIs, and internal enterprise services with controlled access',
+  },
+  {
+    icon: '✅',
+    title: 'AI verification in CI',
+    blurb:
+      'Custom CI agents that review code against plan and requirements in the pipeline — cross-model review, plan verifiers, and automated quality gates',
+  },
+  {
+    icon: '🕸️',
+    title: 'Multi-agent orchestration',
+    blurb:
+      'Parallel agent fan-out across git worktrees for migrations and large changes, with adversarial review and per-run cost control',
+  },
+  {
+    icon: '📊',
+    title: 'Evals, cost & AG-UI',
+    blurb:
+      'Trace-based evals for LLM features, cost reporting for AI-assisted delivery, and agent-user interfaces (AG-UI) embedding agents into enterprise apps',
+  },
+];
+
+export const AI_CAPSTONE = {
+  name: 'DevDigest',
+  url: 'https://github.com/AndriiSiuta/dev-digest',
+  blurb:
+    'Capstone of the AI Agentic Engineering course, grown into a working AI engineering platform: GitHub-connected code review with custom reviewer agents, MCP integrations, CI verification, eval pipeline, and a distributable team plugin.',
+};
+
+export const CERTIFICATIONS = [
+  {
+    name: 'AI Agentic Engineering',
+    issuer: 'Neoversity',
+    year: '2026',
+    blurb: 'AI-harness design, SDD pipeline, subagents, MCP, CI verification agents, evals, cost control',
+  },
 ];
 
 export const ACHIEVEMENTS: string[] = [
