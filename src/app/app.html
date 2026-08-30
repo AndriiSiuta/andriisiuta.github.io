@@ -1,0 +1,141 @@
+<nav class="nav">
+  <a class="nav__brand" href="#top">AS<span class="accent">.</span></a>
+  <div class="nav__links">
+    <a href="#experience">Experience</a>
+    <a href="#skills">Skills</a>
+    <a href="#domains">Domains</a>
+    <a href="#contact">Contact</a>
+  </div>
+</nav>
+
+<header class="hero" id="top">
+  <div class="hero__glow hero__glow--pink"></div>
+  <div class="hero__glow hero__glow--violet"></div>
+
+  <p class="hero__whoami mono">$ whoami<span class="cursor">▊</span></p>
+  <h1 class="hero__name">Andrii Siuta</h1>
+
+  <div class="hero__roles" aria-label="Roles">
+    @for (role of roles; track role; let i = $index) {
+      <span class="hero__role mono" [style.--i]="i">{{ role }}</span>
+    }
+  </div>
+
+  <p class="hero__pitch">
+    I design and scale front-end platforms — modern Angular, signals-based
+    architecture, SSR/SSG, and Nx monorepos serving distributed teams across
+    fintech, Web3, healthcare, and mobility.
+  </p>
+
+  <div class="hero__cta">
+    <a class="btn btn--primary" [href]="contact.linkedin" target="_blank" rel="noopener">LinkedIn</a>
+    <a class="btn btn--ghost" [href]="contact.github" target="_blank" rel="noopener">GitHub</a>
+    <a class="btn btn--ghost" href="mailto:{{ contact.email }}">Email me</a>
+  </div>
+
+  <p class="hero__meta mono">📍 {{ contact.location }} · open to consulting &amp; architecture work</p>
+</header>
+
+<section class="metrics" appReveal>
+  @for (m of metrics; track m.label) {
+    <div class="metric">
+      <span class="metric__value">{{ m.value }}</span>
+      <span class="metric__label">{{ m.label }}</span>
+    </div>
+  }
+</section>
+
+<section class="section" id="experience">
+  <h2 class="section__title"><span class="mono accent">01.</span> Experience</h2>
+  <div class="timeline">
+    @for (job of jobs; track job.company + job.period) {
+      <article class="timeline__item" [class.timeline__item--current]="job.current" appReveal>
+        <div class="timeline__dot"></div>
+        <div class="card">
+          <header class="card__head">
+            <div>
+              <h3 class="card__company">{{ job.company }}</h3>
+              <p class="card__role">{{ job.role }}</p>
+            </div>
+            <div class="card__side">
+              <span class="card__period mono">{{ job.period }}</span>
+              <span class="card__domain">{{ job.domain }}</span>
+            </div>
+          </header>
+          <ul class="card__list">
+            @for (h of job.highlights; track h) {
+              <li>{{ h }}</li>
+            }
+          </ul>
+        </div>
+      </article>
+    }
+  </div>
+</section>
+
+<section class="section" id="skills">
+  <h2 class="section__title"><span class="mono accent">02.</span> Skills</h2>
+  <div class="grid grid--skills">
+    @for (group of skillGroups; track group.title) {
+      <div class="card card--skill" appReveal>
+        <h3 class="card__skill-title">{{ group.icon }} {{ group.title }}</h3>
+        <div class="chips">
+          @for (s of group.skills; track s) {
+            <span class="chip">{{ s }}</span>
+          }
+        </div>
+      </div>
+    }
+  </div>
+</section>
+
+<section class="section" id="domains">
+  <h2 class="section__title"><span class="mono accent">03.</span> Domain expertise</h2>
+  <div class="grid grid--domains">
+    @for (d of domains; track d.title) {
+      <div class="card card--domain" appReveal>
+        <span class="card__icon">{{ d.icon }}</span>
+        <h3>{{ d.title }}</h3>
+        <p>{{ d.blurb }}</p>
+      </div>
+    }
+  </div>
+</section>
+
+<section class="section" id="achievements">
+  <h2 class="section__title"><span class="mono accent">04.</span> Key achievements</h2>
+  <ul class="achievements" appReveal>
+    @for (a of achievements; track a) {
+      <li><span class="accent mono">▹</span> {{ a }}</li>
+    }
+  </ul>
+</section>
+
+<section class="section section--edu" id="education" appReveal>
+  <h2 class="section__title"><span class="mono accent">05.</span> Education</h2>
+  <div class="edu">
+    @for (e of education; track e.school) {
+      <div class="edu__item">
+        <h3>{{ e.school }}</h3>
+        <p>{{ e.degree }} <span class="mono edu__years">{{ e.years }}</span></p>
+      </div>
+    }
+  </div>
+</section>
+
+<footer class="footer" id="contact">
+  <h2 class="footer__title">Let's build something scalable.</h2>
+  <p class="footer__sub">
+    Consulting, architecture reviews, Nx migrations, performance work — or a
+    conversation about your platform.
+  </p>
+  <a class="btn btn--primary btn--big" href="mailto:{{ contact.email }}">{{ contact.email }}</a>
+  <div class="footer__links">
+    <a [href]="contact.linkedin" target="_blank" rel="noopener">LinkedIn</a>
+    <span>·</span>
+    <a [href]="contact.github" target="_blank" rel="noopener">GitHub</a>
+  </div>
+  <p class="footer__note mono">
+    © {{ year }} Andrii Siuta — built with Angular 22 · SSG · deployed on GitHub Pages
+  </p>
+</footer>
