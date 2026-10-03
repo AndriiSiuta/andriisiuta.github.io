@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Writing — Andrii Siuta</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Articles by Andrii Siuta on Angular architecture, Nx monorepos and AI-assisted engineering.">
+  <meta property="og:title" content="Writing — Andrii Siuta">
+  <meta property="og:description" content="Articles on Angular architecture, Nx monorepos and AI-assisted engineering.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://andriisiuta.github.io/articles/">
+  <link rel="canonical" href="https://andriisiuta.github.io/articles/">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚡</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #06060f;
+      --bg-card: #0d0d1c;
+      --bg-card-hover: #12122a;
+      --border: #1e1e3a;
+      --text: #d6d6e7;
+      --text-dim: #8a8aa3;
+      --heading: #f4f4fb;
+      --pink: #ff3e7f;
+      --violet: #a855f7;
+      --gradient: linear-gradient(90deg, #f0060b 0%, #cc26d5 55%, #7702ff 100%);
+      --font-body: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+      --font-head: 'Space Grotesk', var(--font-body);
+      --font-mono: 'JetBrains Mono', ui-monospace, 'Fira Code', monospace;
+      color-scheme: dark;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background:
+        radial-gradient(ellipse 60% 40% at 70% -10%, rgba(119, 2, 255, 0.14), transparent),
+        radial-gradient(ellipse 50% 35% at 20% 10%, rgba(255, 62, 127, 0.1), transparent),
+        var(--bg);
+      color: var(--text);
+      font-family: var(--font-body);
+      font-size: 16px;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    a { color: var(--pink); text-decoration: none; }
+
+    .mono { font-family: var(--font-mono); }
+    .accent { color: var(--pink); }
+
+    .nav {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px max(16px, calc(50vw - 506px));
+      backdrop-filter: blur(12px);
+      background: rgba(6, 6, 15, 0.7);
+      border-bottom: 1px solid rgba(30, 30, 58, 0.6);
+    }
+
+    .nav__brand { font-family: var(--font-head); font-weight: 700; font-size: 1.4rem; color: var(--heading); }
+    .nav__links { display: flex; gap: 22px; }
+    .nav__links a { color: var(--text-dim); font-size: 0.9rem; transition: color 0.2s; }
+    .nav__links a:hover { color: var(--pink); }
+
+    .wrap { max-width: 1060px; margin: 0 auto; padding: 0 16px; }
+
+    .hero { padding: 80px 0 30px; }
+
+    .hero__eyebrow { color: var(--pink); font-size: 0.95rem; margin: 0 0 10px; }
+
+    .hero__title {
+      font-family: var(--font-head);
+      font-size: clamp(2.2rem, 6vw, 3.6rem);
+      font-weight: 700;
+      line-height: 1.05;
+      margin: 0 0 14px;
+      background: var(--gradient);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+
+    .hero__sub { color: var(--text-dim); max-width: 600px; margin: 0; }
+
+    .list { display: grid; gap: 16px; padding: 30px 0 80px; }
+
+    .post {
+      display: block;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 26px 28px;
+      color: var(--text);
+      transition: border-color 0.25s, background 0.25s, transform 0.25s;
+    }
+
+    .post:hover { border-color: rgba(168, 85, 247, 0.5); background: var(--bg-card-hover); transform: translateY(-2px); }
+
+    .post__meta { color: var(--text-dim); font-size: 0.8rem; margin: 0 0 10px; display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; }
+
+    .post__title { font-family: var(--font-head); color: var(--heading); font-size: 1.35rem; margin: 0 0 10px; line-height: 1.25; }
+
+    .post__blurb { color: var(--text-dim); margin: 0 0 14px; }
+
+    .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+
+    .chip {
+      font-family: var(--font-mono);
+      font-size: 0.74rem;
+      color: var(--text);
+      background: rgba(168, 85, 247, 0.1);
+      border: 1px solid rgba(168, 85, 247, 0.3);
+      border-radius: 999px;
+      padding: 3px 11px;
+    }
+
+    .footer__note { text-align: center; color: var(--text-dim); font-size: 0.75rem; opacity: 0.7; padding-bottom: 40px; }
+
+    @media (max-width: 640px) {
+      .hero { padding-top: 56px; }
+      .nav__links { gap: 14px; }
+      .nav__links a { font-size: 0.8rem; }
+    }
+  </style>
+</head>
+<body>
+  <nav class="nav">
+    <a class="nav__brand" href="/">AS<span class="accent">.</span></a>
+    <div class="nav__links">
+      <a href="/">CV</a>
+      <a href="/articles/">Writing</a>
+      <a href="https://github.com/AndriiSiuta" target="_blank" rel="noopener">GitHub</a>
+      <a href="https://www.linkedin.com/in/andrii-siuta/" target="_blank" rel="noopener">LinkedIn</a>
+    </div>
+  </nav>
+
+  <div class="wrap">
+    <header class="hero">
+      <p class="hero__eyebrow mono">$ ls articles/</p>
+      <h1 class="hero__title">Writing</h1>
+      <p class="hero__sub">Case studies from production front-end work: Angular architecture, Nx monorepos, and the AI-agent harnesses that ship them.</p>
+    </header>
+
+    <main class="list">
+      <a class="post" href="/articles/nx-migration/">
+        <p class="post__meta mono"><span>October 2026</span><span>·</span><span>~25 min read</span></p>
+        <h2 class="post__title">Migrating a production Angular app to Nx in twelve days</h2>
+        <p class="post__blurb">
+          One <code>src/app</code> with 18 domain folders, 28 NgModules and a shared folder everybody imported
+          became 42 tagged libraries behind an ESLint-enforced boundary, with feature work still merging and AI
+          agents doing the moves. The plan, the rules that survived, the two I reversed, and the numbers.
+        </p>
+        <div class="chips">
+          <span class="chip">Angular 21</span>
+          <span class="chip">Nx 23</span>
+          <span class="chip">module boundaries</span>
+          <span class="chip">nx affected</span>
+          <span class="chip">Claude Code</span>
+        </div>
+      </a>
+    </main>
+
+    <p class="footer__note mono">© 2026 Andrii Siuta · deployed on GitHub Pages</p>
+  </div>
+</body>
+</html>

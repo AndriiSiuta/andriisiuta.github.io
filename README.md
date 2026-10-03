@@ -21,3 +21,6 @@ git add -A && git commit -m "deploy" && git push
 ```
 
 Content lives in `src/app/data.ts` — edit it and redeploy to update the CV.
+
+Long-form articles are static pages under `public/articles/<slug>/index.html` (listed in
+`public/articles/index.html`); the build copies `public/` as-is, so they ship with the same deploy.

@@ -1,0 +1,1416 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Migrating a production Angular app to Nx in twelve days — Andrii Siuta</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="How one src/app with 18 domain folders, 28 NgModules and a shared dump became 42 tagged Nx libraries behind an ESLint-enforced boundary, with feature work still merging and AI agents doing the moves. The plan, the rules that survived, the ones that didn't, and the numbers.">
+  <meta property="og:title" content="Migrating a production Angular app to Nx in twelve days">
+  <meta property="og:description" content="18 domain folders → 42 tagged libraries, 16 cross-scope edges → 0, Jest on a single-domain PR 118 s → 21 s. A case study with the rules, the reversals and the agent token ledger.">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://andriisiuta.github.io/articles/nx-migration/">
+  <meta property="article:published_time" content="2026-10-03">
+  <meta property="article:author" content="Andrii Siuta">
+  <link rel="canonical" href="https://andriisiuta.github.io/articles/nx-migration/">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚡</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #06060f;
+      --bg-card: #0d0d1c;
+      --bg-card-hover: #12122a;
+      --border: #1e1e3a;
+      --text: #d6d6e7;
+      --text-dim: #8a8aa3;
+      --heading: #f4f4fb;
+      --pink: #ff3e7f;
+      --violet: #a855f7;
+      --red: #f0060b;
+      --green: #3ddc97;
+      --gradient: linear-gradient(90deg, #f0060b 0%, #cc26d5 55%, #7702ff 100%);
+      --gradient-soft: linear-gradient(90deg, #ff3e7f 0%, #a855f7 100%);
+      --font-body: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+      --font-head: 'Space Grotesk', var(--font-body);
+      --font-mono: 'JetBrains Mono', ui-monospace, 'Fira Code', monospace;
+      color-scheme: dark;
+    }
+
+    * { box-sizing: border-box; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      margin: 0;
+      background:
+        radial-gradient(ellipse 60% 40% at 70% -10%, rgba(119, 2, 255, 0.14), transparent),
+        radial-gradient(ellipse 50% 35% at 20% 10%, rgba(255, 62, 127, 0.1), transparent),
+        var(--bg);
+      color: var(--text);
+      font-family: var(--font-body);
+      font-size: 16px;
+      line-height: 1.65;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    ::selection { background: rgba(255, 62, 127, 0.35); color: #fff; }
+
+    .mono { font-family: var(--font-mono); }
+    .accent { color: var(--pink); }
+
+    a { color: var(--pink); text-decoration: none; }
+    a:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+    /* ---------- nav ---------- */
+
+    .nav {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px max(16px, calc(50vw - 506px));
+      backdrop-filter: blur(12px);
+      background: rgba(6, 6, 15, 0.7);
+      border-bottom: 1px solid rgba(30, 30, 58, 0.6);
+    }
+
+    .nav__brand {
+      font-family: var(--font-head);
+      font-weight: 700;
+      font-size: 1.4rem;
+      color: var(--heading);
+    }
+
+    .nav__brand:hover { text-decoration: none; }
+
+    .nav__links { display: flex; gap: 22px; }
+
+    .nav__links a {
+      color: var(--text-dim);
+      font-size: 0.9rem;
+      transition: color 0.2s;
+    }
+
+    .nav__links a:hover { color: var(--pink); text-decoration: none; }
+
+    /* ---------- layout ---------- */
+
+    .wrap { max-width: 1060px; margin: 0 auto; padding: 0 16px; }
+    .article { max-width: 760px; margin: 0 auto; }
+
+    /* ---------- hero ---------- */
+
+    .hero { position: relative; padding: 80px 0 40px; }
+
+    .hero__glow {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(90px);
+      pointer-events: none;
+    }
+
+    .hero__glow--pink { width: 380px; height: 380px; top: -60px; right: -80px; background: rgba(255, 62, 127, 0.16); }
+    .hero__glow--violet { width: 300px; height: 300px; bottom: -40px; left: -100px; background: rgba(119, 2, 255, 0.16); }
+
+    .hero__eyebrow { color: var(--pink); font-size: 0.95rem; margin: 0 0 14px; }
+
+    .cursor { animation: blink 1.1s step-end infinite; }
+
+    @keyframes blink { 50% { opacity: 0; } }
+
+    .hero__title {
+      font-family: var(--font-head);
+      font-size: clamp(2rem, 5.2vw, 3.4rem);
+      font-weight: 700;
+      line-height: 1.08;
+      margin: 0 0 20px;
+      background: var(--gradient);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      filter: drop-shadow(0 0 24px rgba(204, 38, 213, 0.25));
+    }
+
+    .hero__dek {
+      color: var(--text-dim);
+      font-size: 1.12rem;
+      line-height: 1.6;
+      margin: 0 0 26px;
+      max-width: 700px;
+    }
+
+    .hero__meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 14px;
+      align-items: center;
+      color: var(--text-dim);
+      font-size: 0.85rem;
+    }
+
+    .chip {
+      font-family: var(--font-mono);
+      font-size: 0.74rem;
+      color: var(--text);
+      background: rgba(168, 85, 247, 0.1);
+      border: 1px solid rgba(168, 85, 247, 0.3);
+      border-radius: 999px;
+      padding: 3px 11px;
+    }
+
+    /* ---------- metrics ---------- */
+
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+      margin: 30px 0 10px;
+    }
+
+    .metric {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 18px 14px;
+      text-align: center;
+      transition: border-color 0.25s, transform 0.25s;
+    }
+
+    .metric:hover { border-color: rgba(255, 62, 127, 0.5); transform: translateY(-3px); }
+
+    .metric__value {
+      display: block;
+      font-family: var(--font-head);
+      font-size: 1.55rem;
+      font-weight: 700;
+      line-height: 1.15;
+      letter-spacing: -0.01em;
+      background: var(--gradient-soft);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      white-space: nowrap;
+    }
+
+    .metric__label { display: block; color: var(--text-dim); font-size: 0.8rem; margin-top: 6px; }
+
+    /* ---------- toc ---------- */
+
+    .toc {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px 24px;
+      margin: 36px 0 10px;
+    }
+
+    .toc__title {
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin: 0 0 12px;
+    }
+
+    .toc ol {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      columns: 2;
+      column-gap: 28px;
+    }
+
+    .toc li { margin: 0 0 7px; break-inside: avoid; font-size: 0.93rem; }
+    .toc li a { color: var(--text); }
+    .toc li a:hover { color: var(--pink); text-decoration: none; }
+    .toc .n { font-family: var(--font-mono); color: var(--pink); font-size: 0.8rem; margin-right: 8px; }
+
+    /* ---------- prose ---------- */
+
+    .section { padding: 54px 0 4px; }
+
+    .section__title {
+      font-family: var(--font-head);
+      font-size: 1.65rem;
+      color: var(--heading);
+      margin: 0 0 24px;
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+      line-height: 1.25;
+    }
+
+    .section__title::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      min-width: 24px;
+      background: linear-gradient(90deg, var(--border), transparent);
+    }
+
+    .section__title .num { font-family: var(--font-mono); color: var(--pink); font-size: 1rem; flex-shrink: 0; }
+
+    h3 {
+      font-family: var(--font-head);
+      color: var(--heading);
+      font-size: 1.15rem;
+      margin: 34px 0 12px;
+    }
+
+    p { margin: 0 0 16px; }
+
+    .article ul, .article ol { margin: 0 0 18px; padding-left: 22px; }
+    .article li { margin-bottom: 7px; }
+    .article li::marker { color: var(--pink); }
+
+    strong { color: var(--heading); font-weight: 600; }
+
+    code {
+      font-family: var(--font-mono);
+      font-size: 0.86em;
+      background: rgba(168, 85, 247, 0.1);
+      border: 1px solid rgba(168, 85, 247, 0.22);
+      border-radius: 5px;
+      padding: 1px 6px;
+      color: var(--text);
+      word-break: break-word;
+    }
+
+    pre {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 18px 20px;
+      margin: 0 0 20px;
+      overflow-x: auto;
+      font-size: 0.82rem;
+      line-height: 1.6;
+    }
+
+    pre code {
+      background: none;
+      border: 0;
+      padding: 0;
+      font-size: inherit;
+      color: var(--text);
+      word-break: normal;
+    }
+
+    .pre__label {
+      display: block;
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      color: var(--text-dim);
+      margin: 0 0 10px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .c { color: var(--text-dim); }
+    .s { color: var(--pink); }
+    .k { color: var(--violet); }
+    .g { color: var(--green); }
+
+    .pull {
+      margin: 28px 0;
+      padding: 6px 0 6px 22px;
+      border-left: 3px solid transparent;
+      border-image: var(--gradient-soft) 1;
+      font-family: var(--font-head);
+      font-size: 1.2rem;
+      line-height: 1.45;
+      color: var(--heading);
+    }
+
+    .pull p { margin: 0; }
+
+    .note {
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--violet);
+      border-radius: 10px;
+      padding: 14px 18px;
+      background: var(--bg-card);
+      margin: 0 0 20px;
+      font-size: 0.95rem;
+    }
+
+    .note p:last-child { margin: 0; }
+
+    .note__tag {
+      display: inline-block;
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      color: var(--violet);
+      border: 1px solid rgba(168, 85, 247, 0.5);
+      border-radius: 999px;
+      padding: 2px 9px;
+      margin-bottom: 8px;
+    }
+
+    .note--pink { border-left-color: var(--pink); }
+    .note--pink .note__tag { color: var(--pink); border-color: rgba(255, 62, 127, 0.5); }
+
+    /* ---------- tables ---------- */
+
+    .table-wrap { overflow-x: auto; margin: 0 0 22px; border: 1px solid var(--border); border-radius: 12px; }
+
+    table { width: 100%; border-collapse: collapse; font-size: 0.9rem; min-width: 480px; }
+
+    th, td { padding: 10px 14px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--border); }
+
+    th {
+      font-family: var(--font-mono);
+      font-weight: 600;
+      font-size: 0.74rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-dim);
+      background: var(--bg-card);
+    }
+
+    tr:last-child td { border-bottom: 0; }
+    tbody tr:hover td { background: rgba(168, 85, 247, 0.05); }
+
+    td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    td.mono { font-size: 0.8rem; }
+    td:first-child code { white-space: nowrap; }
+
+    /* ---------- figure ---------- */
+
+    figure { margin: 26px 0 24px; }
+
+    figure svg { display: block; width: 100%; max-width: 100%; height: auto; }
+
+    figure svg text { font-family: var(--font-mono); }
+
+    figcaption { color: var(--text-dim); font-size: 0.86rem; margin-top: 12px; line-height: 1.5; }
+
+    /* ---------- footer ---------- */
+
+    .footer { text-align: center; padding: 80px 0 50px; }
+
+    .footer__title { font-family: var(--font-head); font-size: clamp(1.4rem, 4vw, 2rem); color: var(--heading); margin: 0 0 12px; }
+
+    .footer__sub { color: var(--text-dim); max-width: 520px; margin: 0 auto 26px; }
+
+    .btn {
+      display: inline-block;
+      padding: 12px 26px;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 0.95rem;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .btn:hover { text-decoration: none; transform: translateY(-2px); }
+
+    .btn--primary { background: var(--gradient-soft); color: #fff; box-shadow: 0 0 24px rgba(255, 62, 127, 0.35); }
+    .btn--primary:hover { box-shadow: 0 0 36px rgba(168, 85, 247, 0.5); }
+
+    .btn--ghost { border: 1px solid var(--border); color: var(--text); margin-left: 10px; }
+    .btn--ghost:hover { border-color: var(--pink); color: var(--pink); }
+
+    .footer__note { margin-top: 40px; color: var(--text-dim); font-size: 0.75rem; opacity: 0.7; }
+
+    @media (max-width: 640px) {
+      .hero { padding-top: 56px; }
+      .nav__links { gap: 14px; }
+      .nav__links a { font-size: 0.8rem; }
+      .metrics { grid-template-columns: repeat(2, 1fr); }
+      .metric__value { font-size: 1.3rem; }
+      .toc ol { columns: 1; }
+      figure { overflow-x: auto; }
+      figure svg { min-width: 640px; }
+      .pull { font-size: 1.05rem; }
+      .btn--ghost { margin-left: 0; margin-top: 10px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      .cursor { animation: none; }
+      .metric, .btn { transition: none; }
+    }
+  </style>
+</head>
+<body>
+  <nav class="nav">
+    <a class="nav__brand" href="/">AS<span class="accent">.</span></a>
+    <div class="nav__links">
+      <a href="/">CV</a>
+      <a href="/articles/">Writing</a>
+      <a href="https://github.com/AndriiSiuta" target="_blank" rel="noopener">GitHub</a>
+      <a href="https://www.linkedin.com/in/andrii-siuta/" target="_blank" rel="noopener">LinkedIn</a>
+    </div>
+  </nav>
+
+  <div class="wrap">
+    <header class="hero">
+      <div class="hero__glow hero__glow--pink"></div>
+      <div class="hero__glow hero__glow--violet"></div>
+      <p class="hero__eyebrow mono">$ cat articles/nx-migration.md<span class="cursor">▊</span></p>
+      <h1 class="hero__title">Migrating a production Angular app to Nx in twelve days</h1>
+      <p class="hero__dek">
+        One <code>src/app</code> with 18 domain folders, 28 NgModules and a <code>shared</code> folder that
+        everybody imported became 42 tagged libraries behind an ESLint-enforced boundary. Feature work kept
+        merging the whole time, and AI agents did the moves. This is the plan, the rules that survived contact
+        with the code, the two I reversed, and the numbers.
+      </p>
+      <div class="hero__meta">
+        <span>Andrii Siuta</span>
+        <span>·</span>
+        <span>October 2026</span>
+        <span>·</span>
+        <span>~25 min read</span>
+        <span class="chip">Angular 21</span>
+        <span class="chip">Nx 23</span>
+        <span class="chip">ESLint 9</span>
+        <span class="chip">Jest 30</span>
+        <span class="chip">Claude Code</span>
+      </div>
+
+      <div class="metrics" aria-label="Key numbers">
+        <div class="metric"><span class="metric__value">18 → 0</span><span class="metric__label">domain folders in src/app</span></div>
+        <div class="metric"><span class="metric__value">0 → 42</span><span class="metric__label">tagged libraries</span></div>
+        <div class="metric"><span class="metric__value">28 → 0</span><span class="metric__label">NgModules</span></div>
+        <div class="metric"><span class="metric__value">16 → 0</span><span class="metric__label">cross-scope import edges</span></div>
+        <div class="metric"><span class="metric__value">118 s → 21 s</span><span class="metric__label">Jest on a single-domain PR</span></div>
+        <div class="metric"><span class="metric__value">10 PRs</span><span class="metric__label">17 – 29 September</span></div>
+      </div>
+    </header>
+
+    <main class="article">
+      <nav class="toc" aria-label="Contents">
+        <p class="toc__title">Contents</p>
+        <ol>
+          <li><span class="n">01</span><a href="#start">The starting point</a></li>
+          <li><span class="n">02</span><a href="#why">Why Nx, and why not just folders</a></li>
+          <li><span class="n">03</span><a href="#plan">The plan: one phase, one PR</a></li>
+          <li><span class="n">04</span><a href="#tags">The tag table</a></li>
+          <li><span class="n">05</span><a href="#graph">What the project graph taught me</a></li>
+          <li><span class="n">06</span><a href="#reversed">Two rules I reversed</a></li>
+          <li><span class="n">07</span><a href="#slices">Business slices inside a feature library</a></li>
+          <li><span class="n">08</span><a href="#ci">CI on Nx: affected, per-project Jest, the gate</a></li>
+          <li><span class="n">09</span><a href="#guards">Guards, not guidelines</a></li>
+          <li><span class="n">10</span><a href="#agents">Running the migration with AI agents</a></li>
+          <li><span class="n">11</span><a href="#results">Results, and what is still open</a></li>
+          <li><span class="n">12</span><a href="#again">If I did it again</a></li>
+        </ol>
+      </nav>
+
+      <!-- ============================================================ -->
+      <section class="section" id="start">
+        <h2 class="section__title"><span class="num">01.</span> The starting point</h2>
+
+        <p>
+          The application is the customer portal of an EV smart-charging platform: facilities, charging
+          stations, vehicles, charging groups, sessions, analytics, a live fleet map, user management.
+          Angular 21.2 with standalone components, TypeScript 5.9, NGXS where a domain holds state,
+          Angular Material with PrimeNG in the redesigned tables, Jest 30, Azure DevOps pipelines. About
+          1,600 source files and 4,400 tests. A busy codebase: roughly 190 merges to <code>main</code> in the
+          six months before the migration, with four or five people committing.
+        </p>
+
+        <p>
+          Structurally it was one Angular CLI application. <code>src/app</code> held 18 domain folders. Sixteen
+          of them were organised by technical kind (<code>components/ services/ models/ resolvers/ store/
+          utils/</code>), and a <code>shared</code> folder had grown into the thing every architecture document
+          forbids: 41 component folders, several with <code>*-new</code> twins left over from redesigns,
+          imported by 17 of the 18 domains through 1,219 import statements. A tracked architecture document
+          described a Feature-Sliced Design layout. Two folders followed it.
+        </p>
+
+        <p>The import graph was where it hurt. Measured on the day the migration spec was written:</p>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Measure</th><th class="num">Value</th><th>Note</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Cross-scope production imports</td><td class="num">16</td><td>one domain reaching into another's folder</td></tr>
+              <tr><td>Upward imports from <code>shared</code></td><td class="num">10</td><td><code>shared</code> importing four domains</td></tr>
+              <tr><td>Two-way edges</td><td class="num">10</td><td><code>sessions ↔ analytics</code>, <code>home ↔ shared</code>, <code>profile ↔ users</code>…</td></tr>
+              <tr><td><code>@NgModule</code> files</td><td class="num">28</td><td>10 lazy feature modules, 10 routing modules, 8 wrappers</td></tr>
+              <tr><td>Services provided only by a module</td><td class="num">32</td><td>7 features lazy-loaded at two or three paths each</td></tr>
+              <tr><td>ESLint errors / warnings</td><td class="num">288 / 4,576</td><td>ESLint 8, not gated in CI</td></tr>
+              <tr><td>PR pipeline, median</td><td class="num">11.3 min</td><td>Jest 4.6 – 6.1 min of it, the whole suite on every PR</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p>
+          Nothing enforced direction. ESLint had no boundary rule, the <code>tsconfig</code> aliases pointed
+          at folders, and a reviewer who did not already know the intended layering had no way to tell an
+          upward import from a normal one. The folder shape was a convention, and a convention does not fail
+          the build.
+        </p>
+      </section>
+
+      <!-- ============================================================ -->
+      <section class="section" id="why">
+        <h2 class="section__title"><span class="num">02.</span> Why Nx, and why not just folders</h2>
+
+        <p>
+          I wanted two things: a mechanical boundary check that fails a pull request, and CI that runs only
+          what a pull request touches. Nx gives both through the same primitive, the project graph.
+          <code>@nx/enforce-module-boundaries</code> reads it to check tags; <code>nx affected</code> reads it to
+          pick tasks. A folder-level tool such as Sheriff would have given me the first. Nothing short of
+          separate projects gives the second, because the unit <code>nx affected</code> schedules is a project,
+          and one root Jest project means every PR runs everything.
+        </p>
+
+        <p>
+          There was a tempting middle path: add an ESLint boundaries plugin over the existing folders and
+          postpone the move. I wrote it up as an architecture decision record and rejected it. An interim
+          boundary tool would have encoded the current folder graph, including its ten upward edges, as law,
+          and I would have migrated twice. One rule from that record survived everything that followed:
+        </p>
+
+        <blockquote class="pull"><p>Never restructure a domain in passing. A move is its own change with its own diff.</p></blockquote>
+
+        <p>
+          A third motivation is specific to 2026. A few weeks earlier I had put a Claude Code harness on this
+          repository: project rules, skills, a planner, implementer and reviewer subagents, and a verification
+          script that runs type-check, tests, lint parity and a conventions check in one command. A
+          restructure of this size is mostly mechanical: hundreds of <code>git mv</code> operations, thousands of
+          rewritten import paths, dozens of near-identical <code>project.json</code> files. That is exactly the
+          work agents do well when the rules are explicit and the gates are mechanical. The ordering was
+          deliberate: harness first, then a restructure planned and executed with agents rather than by hand.
+          <a href="#agents">Section 10</a> has the ledger.
+        </p>
+      </section>
+
+      <!-- ============================================================ -->
+      <section class="section" id="plan">
+        <h2 class="section__title"><span class="num">03.</span> The plan: one phase, one PR</h2>
+
+        <p>
+          The spec fixed the target (one library per domain and layer, tags, an enforced layer order, CI on
+          <code>affected</code>) and the roadmap fixed the order. Every phase was its own pull request against
+          <code>main</code>, shippable on its own, with feature work merging between them.
+        </p>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Merged</th><th>Phase</th><th>What changed</th></tr>
+            </thead>
+            <tbody>
+              <tr><td class="mono">18 Sep</td><td>−1 · NgModules out</td><td>28 modules → route-scoped providers; 57 specs rewritten; a spec guards every bare <code>@Injectable()</code></td></tr>
+              <tr><td class="mono">23 Sep</td><td>0 · ESLint 9 flat config</td><td>angular-eslint 21, typescript-eslint 8; error count pinned at 288 before and after</td></tr>
+              <tr><td class="mono">24 Sep</td><td>1 · Nx, zero file moves</td><td><code>nx init</code>, <code>angular.json</code> → <code>project.json</code>, first library <code>shared/testing</code>; build output byte-identical, second build a cache hit</td></tr>
+              <tr><td class="mono">24 Sep</td><td>2 · Shared split</td><td><code>src/app/shared</code> → five libraries; a TypeScript-API codemod rewrote the imports; cross-scope edges 16 → 0</td></tr>
+              <tr><td class="mono">24 Sep</td><td>2 · Boundaries</td><td><code>@nx/enforce-module-boundaries</code> with the tag table; <code>npm run lint:boundaries</code></td></tr>
+              <tr><td class="mono">25 Sep</td><td>2 · Sonar on libs</td><td>pipeline template reads coverage for <code>libs/</code>; lcov files merged</td></tr>
+              <tr><td class="mono">25 Sep</td><td>3a · Leaf domains</td><td>facilities, charger types, vehicle types, vehicle groups: 6 libraries, 229 renames</td></tr>
+              <tr><td class="mono">28 Sep</td><td>3b–3e + 4 · Domains and the app move</td><td>users, configurations, sessions, analytics, dashboard, chargers, vehicles; <code>core</code> → <code>libs/shell/feature</code>; <code>src</code> → <code>apps/portal</code>; feature libraries re-sliced by screen. 54 commits, 1,230 files</td></tr>
+              <tr><td class="mono">28 Sep</td><td>5 · CI on Nx</td><td>boundaries gate in the PR pipeline; 37 Jest projects; <code>nx affected</code>; summing lcov merge</td></tr>
+              <tr><td class="mono">29 Sep</td><td>6 · Shared rework</td><td>domain code out of <code>shared</code>; the scope rule relaxed; 35 → 42 libraries; the last ignored cycle removed</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p>Three decisions set the order:</p>
+        <ul>
+          <li><strong>ESLint 9 first</strong>, because the boundaries rule lives in ESLint and the repo was still on 8 with a legacy config.</li>
+          <li><strong>The app moves last.</strong> Renaming the root collides with every open branch and buys nothing until libraries exist. When it finally happened, every open branch rebased once, on an announced day.</li>
+          <li><strong>Leaf domains first.</strong> A domain that imports only <code>shared</code> can become a library without touching anyone else. The tangled ones (sessions, analytics and the live timeline imported each other) waited until the pattern for breaking a cycle was proven on something smaller.</li>
+        </ul>
+
+        <p>Three invariants held at every phase, and each PR had to prove them:</p>
+        <ul>
+          <li><strong>Nothing changes on screen.</strong> No route path, guard, copy or behaviour moves.</li>
+          <li><strong>The pipeline contract is untouched.</strong> The shared Azure templates call exactly <code>npm run ci:install</code>, <code>ci:test</code> and <code>ci:build</code>. The scripts absorb the <code>nx</code> commands; a second repository on the same templates stays green.</li>
+          <li><strong>The build output is byte-identical</strong> to <code>main</code>'s, except the version stamp, or the PR explains the difference with the chunk list.</li>
+        </ul>
+
+        <h3>Phase −1: NgModules become route-scoped providers</h3>
+
+        <p>
+          This was not strictly part of the Nx work, and the harness rules at the time said to leave the 28
+          modules alone until the migration. I overruled that: a library that exports an NgModule is a worse
+          library than one that exports a routes array, and the move would have been done twice. Each lazy
+          domain got a <code>&lt;domain&gt;.routes.ts</code> that exports its routes and a
+          <code>&lt;domain&gt;Providers</code> array, registered on a componentless <code>path: ''</code> root
+          route. That gives one route injector per <code>loadChildren</code> site, which is what the module
+          injector used to give.
+        </p>
+
+<pre><span class="pre__label">libs/chargers/charger-types-feature/src/lib/charger-types.routes.ts</span><code><span class="k">export const</span> chargerTypesProviders: Provider[] = [
+  ChargerTypeNameService,
+  ChargerTypeSaveService,
+  ChargerTypeResolver,
+  ChargerTypesService,
+];
+
+<span class="k">export const</span> chargerTypesRoutes: Routes = [
+  {
+    path: <span class="s">''</span>,
+    providers: chargerTypesProviders,
+    children: [
+      { path: <span class="s">'new'</span>, component: ChargerTypeEditComponent },
+      {
+        path: <span class="s">':id/view'</span>,
+        component: ChargerTypeDetailsViewComponent,
+        resolve: { chargerType: ChargerTypeResolver },
+      },
+      { path: <span class="s">':id/edit'</span>, component: ChargerTypeEditComponent },
+    ],
+  },
+];</code></pre>
+
+        <p>
+          What you lose with modules is the compile-time guarantee that a service is provided somewhere. A
+          bare <code>@Injectable()</code> that nobody lists is a <code>NullInjectorError</code> at runtime, on the
+          one screen that uses it. So a spec replaced the guarantee: it walks every <code>.ts</code> file, finds
+          every <code>@Injectable()</code> without <code>providedIn</code>, and fails unless the class name appears
+          in some <code>providers: [</code> array, <code>&lt;name&gt;Providers = [</code> constant or
+          <code>provideStates([</code> call. It guarded 43 classes on day one and still does.
+        </p>
+
+        <h3>Phase 1: Nx with zero file moves</h3>
+
+        <p>
+          <code>nx init</code> on an Angular CLI workspace is quick and slightly too helpful. It rewrote five npm
+          scripts, added four dev dependencies, and treated a <code>tools/package.json</code> (a helper folder
+          with its own lockfile) as a project. The fixes were small: an <code>.nxignore</code> line,
+          <code>includedScripts: []</code>, scripts restored. The acceptance criterion was the one that mattered:
+          the Docker build produced the same 183 files and 53 lazy chunks as <code>main</code>, byte for byte,
+          and a second <code>nx build</code> was a cache hit.
+        </p>
+
+        <p>
+          The cache then taught the first lesson. The build reads an environment template at build time
+          through a small Node script, and that template was not an input, so a changed environment hit the
+          cache and shipped the old values. The fix is a <code>runtime</code> input in <code>nx.json</code> that
+          hashes the template. Nx cache correctness is exactly as good as your declared inputs.
+        </p>
+
+        <h3>Phase 2: the shared split and the untangle</h3>
+
+        <p>
+          <code>src/app/shared</code> became five libraries (<code>ui</code>, <code>data-access</code>,
+          <code>util</code>, and two topical ones that later disappeared, see <a href="#reversed">section 6</a>).
+          The ten upward imports were fixed in the same PR by lifting the symbols <code>shared</code> had
+          reached for. This was the PR where hand-editing stopped being an option: the move commit touched
+          1,029 files, and 313 of them ended up with duplicate import lines that a second pass merged.
+        </p>
+
+        <p>
+          The codemod is about 300 lines on the TypeScript compiler API, no new dependency. Given a manifest of
+          <em>folder → library</em> moves, it resolves each barrel import through the old
+          <code>shared/index.ts</code> and its sub-barrels to find which new library owns the symbol, rewrites
+          deep imports by path, and refuses to produce a cross-library relative path. Every wave after this one
+          used it with a manifest and produced one commit per domain.
+        </p>
+
+        <p>
+          A library cannot import the app's <code>environment.ts</code>, and the Angular
+          <code>fileReplacements</code> mechanism only works on files the app owns. So the environment became
+          two injection tokens, <code>ENVIRONMENT</code> and <code>RUNTIME_CONFIG_LOADER</code>, provided in
+          <code>main.ts</code> and injected everywhere else. The app provides the values; a library injects them.
+          This is the only way a library reads configuration.
+        </p>
+
+        <div class="note">
+          <span class="note__tag">cost</span>
+          <p>
+            The initial bundle grew by 4 % after the split (6.01 → 6.25 MB raw in the Docker configuration):
+            barrels plus esbuild's conservative side-effect analysis keep more in the initial chunk. A probe
+            with <code>sideEffects: false</code> on each shared library halved the initial bundle (3.30 MB,
+            127 chunks) after an audit of top-level side effects. It is an open follow-up with its own QA
+            click-through, not something to slip into a restructure PR.
+          </p>
+        </div>
+
+        <h3>Phases 3 and 4: domain libraries, leaf first, then the app</h3>
+
+        <p>Per domain the recipe was the same, and the same five files were copied from a neighbour rather than generated:</p>
+
+<pre><span class="pre__label">libs/chargers/data-access/project.json</span><code>{
+  <span class="s">"name"</span>: <span class="s">"chargers-data-access"</span>,
+  <span class="s">"projectType"</span>: <span class="s">"library"</span>,
+  <span class="s">"sourceRoot"</span>: <span class="s">"libs/chargers/data-access/src"</span>,
+  <span class="s">"prefix"</span>: <span class="s">"zcc"</span>,
+  <span class="s">"tags"</span>: [<span class="s">"scope:chargers"</span>, <span class="s">"type:data-access"</span>],
+  <span class="s">"targets"</span>: {}
+}</code></pre>
+
+        <p>
+          <code>git mv</code> the folder into <code>src/lib</code>, write an <code>index.ts</code> that exports
+          the routes array, the providers and whatever another library imports, switch the
+          <code>loadChildren</code> in the app routes to the alias, run the codemod, run the gates. Five waves
+          moved 15 domains into 35 libraries in three days. The last wave moved <code>core</code> (the app
+          shell: layout, guards, interceptors, the root routes) into <code>libs/shell/feature</code>, and then
+          <code>git mv src apps/portal/src</code> with 19 configuration files re-pointed.
+        </p>
+
+        <div class="note">
+          <span class="note__tag">rejected</span>
+          <p>
+            <code>nx g @nx/workspace:convert-to-monorepo</code> looked like the obvious tool for the app move.
+            A dry run showed 1,441 operations that would have nested the existing libraries under
+            <code>libs/libs/</code> and renamed every import alias. The hand move was two commands and a
+            diff I could read.
+          </p>
+        </div>
+      </section>
+
+      <!-- ============================================================ -->
+      <section class="section" id="tags">
+        <h2 class="section__title"><span class="num">04.</span> The tag table</h2>
+
+        <p>
+          Every library carries two tags: <code>scope:&lt;domain&gt;</code> and <code>type:&lt;layer&gt;</code>.
+          Nine scopes (<code>shared</code>, <code>shell</code>, and seven business domains), six types. The
+          alias is <code>@portal/&lt;scope&gt;/&lt;name&gt;</code>, the folder <code>libs/&lt;scope&gt;/&lt;name&gt;</code>,
+          the project name <code>&lt;scope&gt;-&lt;name&gt;</code>. The whole rule set is one file:
+        </p>
+
+<pre><span class="pre__label">eslint.boundaries.config.js</span><code><span class="k">const</span> depConstraints = [
+  { sourceTag: <span class="s">'type:app'</span>, onlyDependOnLibsWithTags: [<span class="s">'*'</span>] },
+  {
+    sourceTag: <span class="s">'type:shell'</span>,
+    onlyDependOnLibsWithTags: [<span class="s">'type:feature'</span>, <span class="s">'type:ui'</span>, <span class="s">'type:data-access'</span>, <span class="s">'type:util'</span>, <span class="s">'type:testing'</span>],
+  },
+  {
+    sourceTag: <span class="s">'type:feature'</span>,
+    onlyDependOnLibsWithTags: [<span class="s">'type:ui'</span>, <span class="s">'type:data-access'</span>, <span class="s">'type:util'</span>, <span class="s">'type:testing'</span>],
+  },
+  {
+    sourceTag: <span class="s">'type:ui'</span>,
+    onlyDependOnLibsWithTags: [<span class="s">'type:ui'</span>, <span class="s">'type:data-access'</span>, <span class="s">'type:util'</span>, <span class="s">'type:testing'</span>],
+  },
+  {
+    sourceTag: <span class="s">'type:data-access'</span>,
+    onlyDependOnLibsWithTags: [<span class="s">'type:data-access'</span>, <span class="s">'type:util'</span>, <span class="s">'type:testing'</span>],
+  },
+  { sourceTag: <span class="s">'type:util'</span>, onlyDependOnLibsWithTags: [<span class="s">'type:util'</span>, <span class="s">'type:testing'</span>] },
+  {
+    sourceTag: <span class="s">'type:testing'</span>,
+    onlyDependOnLibsWithTags: [<span class="s">'type:testing'</span>, <span class="s">'type:data-access'</span>, <span class="s">'type:util'</span>],
+  },
+  { sourceTag: <span class="s">'scope:shell'</span>, onlyDependOnLibsWithTags: [<span class="s">'*'</span>] },
+  { sourceTag: <span class="s">'scope:shared'</span>, onlyDependOnLibsWithTags: [<span class="s">'scope:shared'</span>] },
+];
+
+<span class="c">// a second block restricts @portal/*/testing to *.spec.ts files.</span>
+<span class="c">// run as:</span>
+<span class="c">//   eslint -c eslint.boundaries.config.js --no-inline-config \</span>
+<span class="c">//          --max-warnings 0 apps libs</span></code></pre>
+
+        <figure>
+          <svg viewBox="0 0 760 450" role="img" aria-label="Layer order: app imports anything; shell lazy-loads feature; feature imports ui, data-access and util but never another feature; ui imports ui, data-access, util; data-access imports data-access and util; util imports util. Every layer's specs may import testing, which itself may import data-access and util.">
+            <defs>
+              <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+              </marker>
+              <marker id="arrPink" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M0,0 L10,5 L0,10 z" fill="#ff3e7f"/>
+              </marker>
+            </defs>
+            <g fill="#0d0d1c" stroke="currentColor" stroke-width="1.2">
+              <rect x="50" y="16" width="270" height="40" rx="8"/>
+              <rect x="50" y="90" width="270" height="40" rx="8"/>
+              <rect x="50" y="164" width="270" height="40" rx="8"/>
+              <rect x="50" y="238" width="270" height="40" rx="8"/>
+              <rect x="50" y="312" width="270" height="40" rx="8"/>
+              <rect x="50" y="386" width="270" height="40" rx="8"/>
+              <rect x="490" y="238" width="220" height="40" rx="8" stroke-dasharray="5 4"/>
+            </g>
+            <g fill="currentColor" font-size="13" text-anchor="middle">
+              <text x="185" y="41">type:app · apps/portal</text>
+              <text x="185" y="115">type:shell · libs/shell/feature</text>
+              <text x="185" y="189">type:feature · 13 libraries</text>
+              <text x="185" y="263">type:ui · 10 libraries</text>
+              <text x="185" y="337">type:data-access · 11 libraries</text>
+              <text x="185" y="411">type:util · shared/util</text>
+              <text x="600" y="263">type:testing · 6 libraries</text>
+            </g>
+            <g stroke="currentColor" stroke-width="1.4" fill="none" marker-end="url(#arr)">
+              <line x1="185" y1="56" x2="185" y2="88"/>
+              <line x1="185" y1="130" x2="185" y2="162"/>
+              <line x1="185" y1="204" x2="185" y2="236"/>
+              <line x1="185" y1="278" x2="185" y2="310"/>
+              <line x1="185" y1="352" x2="185" y2="384"/>
+            </g>
+            <g fill="#8a8aa3" font-size="11" text-anchor="start">
+              <text x="196" y="76">anything</text>
+              <text x="196" y="150">import() only · lazy</text>
+              <text x="196" y="224">+ data-access, util</text>
+              <text x="196" y="298">+ ui, util</text>
+              <text x="196" y="372">+ data-access</text>
+            </g>
+            <path d="M320,170 C352,160 352,188 320,181" fill="none" stroke="#ff3e7f" stroke-width="1.6" marker-end="url(#arrPink)"/>
+            <g fill="#ff3e7f" font-size="12" text-anchor="start">
+              <text x="372" y="178">✕ never another feature</text>
+            </g>
+            <g stroke="#8a8aa3" stroke-width="1.1" fill="none" stroke-dasharray="4 4">
+              <line x1="320" y1="198" x2="360" y2="198"/>
+              <line x1="320" y1="258" x2="360" y2="258"/>
+              <line x1="320" y1="332" x2="360" y2="332"/>
+              <line x1="320" y1="406" x2="360" y2="406"/>
+              <line x1="360" y1="198" x2="360" y2="406"/>
+            </g>
+            <line x1="360" y1="258" x2="498" y2="258" stroke="#8a8aa3" stroke-width="1.1" stroke-dasharray="4 4" marker-end="url(#arr)"/>
+            <g fill="#8a8aa3" font-size="11" text-anchor="middle">
+              <text x="429" y="250">*.spec.ts only</text>
+              <text x="600" y="300">imports data-access, util for its types</text>
+            </g>
+            <g fill="#8a8aa3" font-size="11" text-anchor="start">
+              <text x="16" y="441">scope-private: shell, feature.  cross-scope: ui, data-access, util, testing.  shared imports only shared.</text>
+            </g>
+          </svg>
+          <figcaption>
+            Layers point down. A feature reaches <code>ui</code>, <code>data-access</code> and <code>util</code>
+            in any scope and never another feature. Testing libraries are reached from spec files only.
+            Files: <code>eslint.boundaries.config.js</code>, <code>nx show projects --projects 'tag:type:*'</code>.
+          </figcaption>
+        </figure>
+
+        <p>A few rows need a sentence each, because each one came out of a specific wave.</p>
+
+        <ul>
+          <li>
+            <strong>A feature never imports another feature.</strong> A domain is reused through its
+            <code>data-access</code> or <code>ui</code> library. The first wave hit this immediately: the charger
+            types screen is rendered by the charging stations screen, so charger types shipped as
+            <code>charger-types-feature</code> plus <code>charger-types-ui</code>. That became the pattern for every
+            later wave.
+          </li>
+          <li>
+            <strong>A routeless widget another domain renders is <code>ui</code> + <code>data-access</code>, never a
+            feature.</strong> Max capacity has no routes; charging groups renders it. It became
+            <code>max-capacity-ui</code> and <code>max-capacity-data-access</code>, the first domain data-access
+            library in the workspace.
+          </li>
+          <li>
+            <strong><code>type:shell</code> exists because the rule checks <code>import()</code> too.</strong> The shell
+            lazy-loads every feature. Tagged <code>type:feature</code> it would fail at every <code>loadChildren</code>
+            site, so it gets its own row that may reach features, and nothing else may.
+          </li>
+          <li>
+            <strong><code>type:testing</code> is spec-only.</strong> Test generators live in
+            <code>libs/&lt;scope&gt;/testing</code>; a <code>no-restricted-imports</code> block in the same config
+            keeps the alias out of every non-spec file. Why this is a separate type and not a folder is in
+            <a href="#graph">section 5</a>.
+          </li>
+          <li>
+            <strong><code>shared</code> imports only <code>shared</code>.</strong> It holds what no domain owns: the
+            HTTP layer, the feature-flag service, the table helpers, the design-system wrappers. The day a
+            shared library imports a domain, it stops being shared.
+          </li>
+          <li>
+            <strong>The gate cannot be silenced.</strong> <code>lint:boundaries</code> runs with
+            <code>--no-inline-config</code>, so an <code>eslint-disable</code> comment has no effect, and with
+            <code>--max-warnings 0</code>. It takes under four seconds on the whole workspace and is a required
+            step of the PR pipeline. There are no allowances in the config. The one spec-only exception that
+            existed for four days is gone (<a href="#reversed">section 6</a>).
+          </li>
+        </ul>
+      </section>
+
+      <!-- ============================================================ -->
+      <section class="section" id="graph">
+        <h2 class="section__title"><span class="num">05.</span> What the project graph taught me</h2>
+
+        <p>
+          Most of the surprises were about what the graph sees that <code>nx graph</code> does not draw, and
+          what it does not see at all.
+        </p>
+
+        <h3>The rule reports upward imports as cycles</h3>
+
+        <p>
+          In phase 1 I concluded that Nx drops every edge from a library into the root application, because
+          <code>nx graph</code> does not draw them. In phase 2 the rule proved otherwise: it reads
+          <code>readCachedProjectGraph()</code>, and those edges are there. Because the rule's cycle check runs
+          before its "no imports of apps" check, a library that imports the app is reported as
+          <em>Circular dependency between …</em>, not as an upward import. One deliberate upward import in a
+          probe produced 88 cycle errors across the libraries that transitively depended on it. Once you know
+          that, the message is useful: "circular" almost always means "someone imported upward".
+        </p>
+
+        <h3>A <code>typeof import()</code> is an edge</h3>
+
+        <p>
+          The Jest setup file in the app mocked a service with
+          <code>jest.mock&lt;typeof import('@portal/shared/data-access')&gt;</code>. That single type-position
+          import made the app a dependency of every library whose tests load the setup, and the rule
+          produced several hundred findings from it. The fix is <code>import type * as</code>, which the rule
+          ignores. The graph counts spec files and setup files; the boundaries do not stop at
+          <code>.spec.ts</code>.
+        </p>
+
+        <h3>The lazy-library trap</h3>
+
+        <p>
+          A feature library exists to be lazy-loaded. If any file in the shell imports it statically, two bad
+          things happen at once: the boundaries rule flags every import of that library (the rule applies
+          <code>depConstraints</code> to <code>import()</code> and to static imports alike, and a static import
+          of a lazy project changes the edge), and esbuild pulls the whole chunk into the initial bundle. The
+          dashboard wave hit this with a service that the root routes file provided but a lazily loaded screen
+          owned. The service moved into the domain's own providers on a componentless root route inside the
+          library, the first time the rule forced a route-tree edit. No public path changed.
+        </p>
+
+        <blockquote class="pull"><p>A static import of a lazily loaded library is a lint finding and a bigger initial bundle. Both are the same mistake.</p></blockquote>
+
+        <h3>Spec imports are edges, so generators are their own type</h3>
+
+        <p>
+          The first cut put test generators in a <code>testing/</code> folder inside each
+          <code>data-access</code> library and widened the "specs only" ignore to cover it. That pulled eleven
+          app files into every data-access library's production compile, because the generators imported
+          fixtures the app owned. The second cut gave generators their own libraries,
+          <code>libs/&lt;scope&gt;/testing</code>, tagged <code>type:testing</code>. A testing library depends on
+          its scope's <code>data-access</code> for the model types. The reverse, a data-access spec importing its
+          own scope's testing library, is a cycle, because Nx counts the spec import. So a data-access spec
+          builds its fixtures with the generic <code>gen</code>/<code>resolve</code> helpers from
+          <code>shared/testing</code> and literals, and the rule is written down where the next person will look.
+        </p>
+
+        <h3>Sass edges are invisible</h3>
+
+        <p>
+          A <code>@use '../../../other-domain/styles/partial'</code> is an import the project graph never
+          sees. Wave 3b found a 206-line partial two other domains reached by relative path, visible only in
+          the build output. The rule now is that a partial several libraries use lives in a
+          <code>styles/</code> folder at the root of a <code>type:ui</code> library and is reached as
+          <code>@use '&lt;scope&gt;/&lt;name&gt;/styles/&lt;partial&gt;'</code> over an <code>includePaths</code>
+          entry for <code>libs</code>. A small spec, <code>tools/sass-edges.spec.ts</code>, walks every
+          <code>.scss</code> under <code>libs</code> and fails on a <code>@use</code> that resolves into
+          <code>apps/</code> or into a feature library. A wave plan greps <code>.scss</code> as well as
+          <code>.ts</code>.
+        </p>
+
+        <h3>Stale graphs look green</h3>
+
+        <p>
+          Two cache lessons. A library spec edit did not invalidate the root test target until the inputs
+          named everything a test actually reads (the preset, the setup files, the English translation
+          fixture the tests assert against). And the Nx daemon's graph goes stale after a library is renamed or
+          created, and silently drops the library from a run. The verification script sets
+          <code>NX_DAEMON=false</code>; a green run that did not include the project you just made is worse
+          than a red one.
+        </p>
+      </section>
+
+      <!-- ============================================================ -->
+      <section class="section" id="reversed">
+        <h2 class="section__title"><span class="num">06.</span> Two rules I reversed</h2>
+
+        <h3>Where a store lives</h3>
+
+        <p>
+          Wave 3b shipped the users domain with its NGXS store inside <code>users-feature</code>. The spec said
+          "stores stay with their domain", and nothing else read the store, so the feature was its domain. I
+          looked at the result and did not like it: a feature library is routed screens; a store is data
+          access whatever the consumer count, and the moment a second screen needs it you are moving it under
+          pressure. The rule became: <strong>a domain's NGXS quartet (actions, selectors, state, store) lives in
+          its <code>data-access</code> library even when only its own feature reads it</strong>;
+          <code>provideStates([...])</code> stays in the feature's routes file, which imports the state class
+          through the alias. The rule applies by kind: a signal service whose job is held state follows the
+          same path. Three stores moved in the next two waves.
+        </p>
+
+        <p>
+          This is stricter than what Manfred Steyer currently recommends. His recent demos keep a store used
+          by one feature inside the feature and move it to <code>data</code> only when several features share
+          it. His 2023 matrix allows state in data modules, so both are compatible with the same layer order.
+          I prefer the stricter rule for a team: it removes a judgement call, and the cost (one more library
+          alias in a routes file) is nothing.
+        </p>
+
+        <h3>"A cross-scope need is lifted into shared"</h3>
+
+        <p>
+          This was the original scope rule, and it is the one I would warn anyone about. The first tag table
+          said <code>scope:&lt;x&gt;</code> may depend on <code>scope:&lt;x&gt;</code> and <code>scope:shared</code>,
+          nothing else. Clean on a slide. In practice every entity model that two domains share (and in an EV
+          platform a charging station is referenced by five domains) had nowhere to go but
+          <code>shared/util</code>, and every cross-domain service call went through a 24-method façade in
+          <code>shared/data-access</code>. Three domains ended the waves with no <code>data-access</code>
+          library at all, because their models were already in <code>shared</code>. When I audited the result:
+        </p>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>After the domain waves</th><th class="num">Value</th></tr></thead>
+            <tbody>
+              <tr><td>Library source files in <code>libs/shared</code></td><td class="num">442 of 1,631</td></tr>
+              <tr><td>Share of test suites affected by a <code>shared/util</code> change</td><td class="num">99 %</td></tr>
+              <tr><td>Methods on the shared asset façade</td><td class="num">24</td></tr>
+              <tr><td>Domains without a <code>data-access</code> library</td><td class="num">3 of 7</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p>
+          A <code>shared</code> that owns the domain models makes <code>nx affected</code> worthless, because
+          everything is affected. So the last PR of the migration changed the rule:
+        </p>
+
+        <blockquote class="pull"><p>Only <code>feature</code> and <code>shell</code> libraries are scope-private. A scope reaches another scope's <code>data-access</code>, <code>ui</code>, <code>util</code> and <code>testing</code> directly.</p></blockquote>
+
+        <p>
+          The seven <code>scope:&lt;domain&gt;</code> rows left the config. The type rows still forbid importing a
+          feature from anything but the shell, so the ladder holds. The façade split into six
+          <code>&lt;Domain&gt;Api</code> classes, each in its domain's <code>data-access</code>. The models went
+          home. Seven libraries were created, one topical shared library was deleted and absorbed, and the
+          count went from 35 to 42. The remaining cross-scope data-access edges are one-way and listed in the
+          architecture record: users → facilities; chargers → users; configurations → chargers; sessions →
+          vehicles, chargers, facilities, configurations; dashboard → everything below it.
+        </p>
+
+        <p>
+          The same PR removed the last <code>ignoredCircularDependencies</code> entry. A first draft of the
+          rework had added eight ignore pairs to get a wave green; I rejected the lot. Cycles are prevented by
+          pattern, not by exception, and the four patterns are short enough to remember:
+        </p>
+
+        <ol>
+          <li>Layers point down only.</li>
+          <li>A <code>&lt;scope&gt;/testing</code> library depends on its scope's <code>data-access</code> for types, never the reverse.</li>
+          <li>A type that names two domains lives in the downstream library (a "charging station with its group" lives in configurations, which already depends on chargers, not in chargers).</li>
+          <li>Two features that need each other's screens share a <code>ui</code> library, never each other.</li>
+        </ol>
+
+        <p>
+          I cross-checked the result against Steyer's published material before merging, because his
+          "strategic design" matrix is the thing most Angular teams reach for. His cross-cutting area is a
+          <code>shared</code> domain typed like any other domain, reachable from everywhere, which is what we
+          have. He has never used <code>core</code>, so a rename that came up in review was dropped. His
+          modern <code>data</code> libraries are flat; ours keep <code>store/ services/ models/ consts/ utils/</code>
+          inside <code>data-access</code>, which the review called "contradicted as a default, tolerated at
+          size". With a dozen services and a four-file store per domain, the folders stay.
+        </p>
+      </section>
+
+      <!-- ============================================================ -->
+      <section class="section" id="slices">
+        <h2 class="section__title"><span class="num">07.</span> Business slices inside a feature library</h2>
+
+        <p>
+          Moving a folder into a library does not change what is inside it. After the waves, eleven feature
+          libraries had a top-level <code>components/</code>, nine a <code>services/</code>, ten a
+          <code>models/</code>. A library that is "the charger types screens" and opens with
+          <code>components/ services/ models/ resolvers/</code> tells you nothing about which screens exist. So
+          one more pass, 852 renames across 13 libraries, re-sliced every feature library by screen:
+        </p>
+
+<pre><span class="pre__label">before → after</span><code>libs/chargers/charger-types-feature/src/lib/
+  components/              <span class="c">→</span>  charger-type-list/
+  services/                <span class="c">→</span>  charger-type-details/
+  models/                  <span class="c">→</span>  charger-type-edit/
+  resolvers/               <span class="c">→</span>  charging-station-create-multi-dialog/
+  charger-types.routes.ts     charger-types.routes.ts
+                              charger-types.service.ts          <span class="c">← two slices share it</span>
+                              charger-type-resolver.service.ts
+                              charger-type-view.model.ts</code></pre>
+
+        <p>
+          A feature library is the routes file plus one folder per screen or use case; the routed component
+          sits flat in its slice; a file two slices share sits flat at the library root; nothing technical at
+          the top. <code>data-access</code> libraries keep their technical folders, because a service layer
+          really is organised by kind. Steyer's own trees (one folder per component, routes file and feature
+          service flat beside them, no <code>components/</code>) say the same thing, and his 2026 "feature
+          slicing" posts make the argument better than I will here.
+        </p>
+
+        <p>
+          The shape is held by a spec, <code>tools/library-shape.spec.ts</code>, with one row per
+          <code>project.json</code> under <code>libs</code>:
+        </p>
+
+        <ul>
+          <li>a <code>feature</code> library has no top-level folder from a list of twelve technical names or seven FSD segment names;</li>
+          <li>a <code>data-access</code> library has only <code>store/ services/ models/ consts/ utils/</code>;</li>
+          <li>a <code>shared/*</code> library imports no <code>@portal/&lt;scope&gt;</code> alias outside <code>shared</code>, including inside <code>jest.mock</code> strings;</li>
+          <li>a feature library has no root file whose importers all sit in one slice (it belongs in the slice);</li>
+          <li>there are at least 42 libraries, a floor that only goes up.</li>
+        </ul>
+
+        <p>
+          That last row is the pattern for every guard in the repository: a count that never decreases. A
+          guard with a fixed number rots the day someone deletes something legitimately. A guard with a
+          floor that moves up with the codebase catches the deletion that was not legitimate.
+        </p>
+      </section>
+
+      <!-- ============================================================ -->
+      <section class="section" id="ci">
+        <h2 class="section__title"><span class="num">08.</span> CI on Nx: affected, per-project Jest, the gate</h2>
+
+        <p>
+          Up to here the pipeline had not changed: the templates called the same three scripts, and the scripts
+          ran <code>nx build</code> and <code>nx test</code> on one project. The point of the libraries is to run
+          less, and that needs two things: a project graph with many test targets, and a base commit to diff
+          against.
+        </p>
+
+        <h3>Per-project Jest, measured before it was committed</h3>
+
+        <p>
+          One root Jest project with 406 spec files is one task to Nx. Splitting it into 37 projects is more
+          process start-up (each Jest project boots its own worker pool and the Angular preset) in exchange for
+          running only the affected ones. Whether that is a win depends on the PR mix, so I had the split
+          measured in the pipeline's own container (4 CPUs, Node 24, cold each run) before any of it was
+          committed:
+        </p>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>PR shape</th><th class="num">One root project</th><th class="num">37 projects, affected</th><th>Projects run</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Full suite (<code>main</code>)</td><td class="num">117.8 s</td><td class="num">175.0 s</td><td>37</td></tr>
+              <tr><td>Single domain library</td><td class="num">117.8 s</td><td class="num">21.2 s</td><td>3: the library, the shell, the app</td></tr>
+              <tr><td><code>shared/ui</code> change</td><td class="num">117.8 s</td><td class="num">154.8 s</td><td>23</td></tr>
+              <tr><td><code>shared/util</code> change</td><td class="num">117.8 s</td><td class="num">173.7 s</td><td>36</td></tr>
+              <tr><td>Docs only</td><td class="num">117.8 s</td><td class="num">0 s</td><td>0, exits 0</td></tr>
+              <tr><td>Weighted by the last six months of PRs</td><td class="num">117.8 s</td><td class="num">≈ 85 s</td><td>39 % domain-only, 39 % shared, 7 % global, 13 % no source</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p>
+          The worst case is 1.49× slower than before, against a bar I had set at 1.4×. I shipped it anyway,
+          with the reasoning on the story: the average PR is 17 – 28 % faster, a shared-library PR pays about a
+          minute, and the shared rework the following day moved most of the code that made
+          <code>shared/util</code> changes affect 36 projects. The honest number still to collect is the
+          wall time of real PRs against the old 11.3-minute median; three timed PRs are on the list.
+        </p>
+
+        <p>
+          It took three rounds to get coverage right, and the second round would have passed a casual review.
+          Per-project <code>rootDir</code> instruments only that project's own files, so 91 files exercised only
+          by other projects' specs had no coverage record and shared files lost their cross-project hits. The
+          shape that works keeps <code>rootDir</code> at the workspace and limits discovery with
+          <code>roots</code>:
+        </p>
+
+<pre><span class="pre__label">libs/chargers/data-access/jest.config.ts  (one of 37, identical shape)</span><code><span class="k">export default</span> {
+  displayName: <span class="s">'chargers-data-access'</span>,
+  preset: <span class="s">'&lt;rootDir&gt;/jest.preset.js'</span>,
+  rootDir: <span class="s">'../../..'</span>,
+  roots: [<span class="s">'&lt;rootDir&gt;/libs/chargers/data-access'</span>],
+  coverageDirectory: <span class="s">'&lt;rootDir&gt;/coverage/libs/chargers/data-access'</span>,
+} <span class="k">satisfies</span> Config;</code></pre>
+
+        <p>
+          The lcov reporter gets <code>projectRoot</code> so paths are workspace-relative, <code>nx.json</code>
+          names the coverage output explicitly (the Jest plugin's inferred output ignores
+          <code>rootDir</code>), and a small script sums <code>DA</code>/<code>BRDA</code>/<code>FNDA</code> hits
+          per source file across the 37 lcov files before Sonar reads one merged report. Line coverage after
+          the merge matched the single-project number to within four lines. 37 hand-typed eight-line configs
+          are a copy hazard, so <code>tools/jest-config-shape.spec.ts</code> checks each one against its folder.
+        </p>
+
+        <h3>Affected, and the gate</h3>
+
+<pre><span class="pre__label">package.json (scripts, wrapped for reading)</span><code><span class="s">"ci:lint"</span>:  <span class="s">"npm run lint:boundaries"</span>,
+<span class="s">"ci:test"</span>:  <span class="s">"if [ -n \"$NX_BASE\" ]; then
+               nx affected -t test --parallel=2 -- --ci --coverage --maxWorkers=2
+               && node tools/merge-lcov.mjs --allow-empty;
+             else
+               nx run-many -t test --parallel=2 -- --ci --coverage --maxWorkers=2
+               && node tools/merge-lcov.mjs;
+             fi"</span>,
+<span class="s">"ci:build"</span>: <span class="s">"node tools/templify-env.mjs
+             && nx build portal -c docker
+             && node tools/write-version.mjs"</span></code></pre>
+
+        <p>
+          The PR template gained two boolean parameters, default off so the other repository on the same
+          templates is untouched: one adds <code>npm run ci:lint</code> between install and test, the other
+          makes the checkout full-depth and exports <code>NX_BASE</code> as the merge base with the target
+          branch. The <code>main</code> pipeline sets no base, runs everything, and feeds Sonar the full
+          merge. The lint step takes about four seconds and fails a PR with ESLint's own message, which is
+          exactly as readable as you would hope: <em>A project tagged with "type:data-access" can only depend
+          on libs tagged with "type:data-access", "type:util", "type:testing"</em>.
+        </p>
+
+        <h3>Remote cache: skipped, on purpose</h3>
+
+        <p>
+          <code>cache: true</code> only helps on a developer machine; the agent containers start clean. A remote
+          cache would change that. Nx Cloud sends task hashes and outputs outside the organisation and needs a
+          security sign-off; the Azure Storage cache package is deprecated upstream; a self-hosted server
+          implementing the remote-cache API is real work. The story's criterion allowed "an explicit decision
+          to skip, recorded", and that is what happened: revisit after three months of affected numbers. I
+          would rather have the measurement than the feature.
+        </p>
+      </section>
+
+      <!-- ============================================================ -->
+      <section class="section" id="guards">
+        <h2 class="section__title"><span class="num">09.</span> Guards, not guidelines</h2>
+
+        <p>
+          Every rule in this article that matters is held by something that fails, not by a document. The
+          documents exist (an architecture record per decision, a tracked blueprint, a per-scope summary), but
+          they describe the guards; they are not the guards.
+        </p>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Guard</th><th>Fails when</th><th>The failure it prevents</th></tr></thead>
+            <tbody>
+              <tr><td><code>lint:boundaries</code> (CI, ~4 s)</td><td>an import crosses the tag table, forms a cycle, or reaches a testing library from production code</td><td>feature-to-feature coupling, upward imports, a lazy chunk in the initial bundle</td></tr>
+              <tr><td><code>tools/library-shape.spec.ts</code></td><td>a feature library grows a technical folder; <code>shared</code> imports a domain; the library count drops</td><td>the old folder layout coming back one folder at a time</td></tr>
+              <tr><td><code>injectables-are-provided.spec.ts</code></td><td>a bare <code>@Injectable()</code> is in no providers array</td><td>a <code>NullInjectorError</code> on one screen, after the module injectors went</td></tr>
+              <tr><td><code>tools/sass-edges.spec.ts</code></td><td>a <code>@use</code> resolves into <code>apps/</code> or into a feature library</td><td>a style dependency the project graph cannot see</td></tr>
+              <tr><td><code>tools/jest-config-shape.spec.ts</code></td><td>a <code>jest.config.ts</code> names a different project than its folder</td><td>a mis-rooted project passing with <code>passWithNoTests</code></td></tr>
+              <tr><td><code>ENVIRONMENT</code> / <code>RUNTIME_CONFIG_LOADER</code> tokens</td><td>a library tries to import the app's environment file (which the boundaries rule then reports)</td><td>a library that only compiles inside this one app</td></tr>
+              <tr><td>Build parity in every restructure PR</td><td>the chunk list or the initial size moves more than 1 %</td><td>a move that silently changed what loads when</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p>
+          The rule for adding a structural rule is now the inverse: a structural change names the guard that
+          would fail if it were violated, or says plainly that none exists. "Says plainly" is doing a lot of
+          work in that sentence. It is where most of the guards above came from.
+        </p>
+      </section>
+
+      <!-- ============================================================ -->
+      <section class="section" id="agents">
+        <h2 class="section__title"><span class="num">10.</span> Running the migration with AI agents</h2>
+
+        <p>
+          I did not type most of this migration. I wrote the spec, made every ruling, verified every PR by
+          hand before it opened, and reviewed the diffs. Agents investigated, planned, moved the files,
+          rewrote the imports, ran the gates, and reviewed each other. The harness is Claude Code with a
+          repository-specific layer on top:
+        </p>
+
+        <ul>
+          <li><strong>Roles.</strong> An <em>investigator</em> traces a ticket end to end and writes a facts note; a <em>spec-writer</em> turns the brainstorm into a spec with acceptance criteria; a <em>planner</em> writes tagged tasks; <em>implementers</em> (one for judgement work, one for recipe work such as a routes file or a rename) each take a task brief, verify and commit from a pathspec; a <em>conventions reviewer</em> and a <em>code reviewer</em> read each new shape; a <em>PR creator</em> opens the pull request only after I have verified the branch.</li>
+          <li><strong>Tiers.</strong> A change is sized at the brainstorm: S (three files, no spec), M (one screen or contract, at most five tasks), L (a library, a cross-scope change, a wave). Every migration phase was an L.</li>
+          <li><strong>Gates in one command.</strong> A verification script runs app and spec type-checks, the related Jest projects, ESLint parity against the base (no new errors on touched files, since <code>main</code> carries 288), a conventions pass (translation-key parity, added comments, added <code>eslint-disable</code>, harness files in the commit range) and <code>lint:boundaries</code>. An implementer's report is rejected by a hook unless it names the files, the checks, and what it deferred.</li>
+          <li><strong>Run reports.</strong> Every L run ends with a report: what merged, every ruling I made with what it costs if wrong, departures from the spec, open follow-ups, and a token ledger per agent run. The reports are what made this article possible. They are also what the next planner reads.</li>
+        </ul>
+
+        <h3>The ledger</h3>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Run</th><th class="num">Subagent tokens</th><th>Note</th></tr></thead>
+            <tbody>
+              <tr><td>NgModule removal</td><td class="num">3.24 M</td><td>38 agent runs; two reviewers wrong about injector lifetime, refuted by a throwaway spec</td></tr>
+              <tr><td>ESLint 9 + Nx standalone layout</td><td class="num">1.41 M</td><td></td></tr>
+              <tr><td>Shared split and untangle</td><td class="num">2.88 M</td><td>the codemod and the 1,029-file move</td></tr>
+              <tr><td>Module boundaries</td><td class="num">0.92 M</td><td></td></tr>
+              <tr><td>Waves 3a – 3e (five domain waves)</td><td class="num">10.64 M</td><td>three planners in one wave cost 1.03 M on their own</td></tr>
+              <tr><td>Shell and app move</td><td class="num">2.58 M</td><td></td></tr>
+              <tr><td>Business slices</td><td class="num">2.83 M</td><td>852 renames</td></tr>
+              <tr><td>CI on Nx</td><td class="num">3.14 M</td><td>31 runs; the Jest spike alone 0.65 M over three rounds</td></tr>
+              <tr><td>Shared rework</td><td class="num">5.42 M</td><td>52 runs, eight waves in one day</td></tr>
+              <tr><td><strong>Total, subagents</strong></td><td class="num"><strong>≈ 32 M</strong></td><td>after removing rows ledgered twice; my own session's context is not counted</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p>
+          Thirty-two million tokens over twelve days for a migration that touched 1,600 files. Whether that is
+          cheap depends on what you compare it with; the comparison I use is the four-week estimate I would
+          have given for doing it by hand with two engineers, and the fact that feature work did not stop.
+        </p>
+
+        <h3>What worked</h3>
+
+        <ul>
+          <li><strong>Mechanical gates caught the risk before any reviewer did.</strong> The NgModule run report says it in one line, and every later report confirmed it: type-check, the DI census spec, build parity and <code>lint:boundaries</code> found the real problems; reviewers found style.</li>
+          <li><strong>Review budget follows change shape.</strong> Per-task reviews yielded 0.3 code-changing findings per 100k tokens; the single whole-branch review at the end yielded 4.8. So the per-task reviewers now run only on a task that introduces a new shape, repeats of a shape get one batched pass per wave, and the whole-branch review runs once, scoped to the files that carry logic.</li>
+          <li><strong>Codemod plus manifest, one commit per domain.</strong> The implementer edits a manifest, the codemod does the rename, the build has to come out byte-equal. Agents are much better at writing a manifest than at hand-rewriting 300 import lines, and the diff is reviewable.</li>
+          <li><strong>Rulings with a price.</strong> Every decision in a run report carries "cost if wrong". It is a cheap discipline that made the two reversals in <a href="#reversed">section 6</a> easy to make, because the cost of the original rule had been written down when it was made.</li>
+        </ul>
+
+        <h3>What did not</h3>
+
+        <ul>
+          <li><strong>Planners were expensive</strong>: 300 – 480k tokens per plan at first, because the planner had no edit tool and rewrote the whole plan on each revision. Fixed by giving it one; still the single most expensive role per run.</li>
+          <li><strong>Verification output bloat.</strong> The spec type-check prints 104 pre-existing errors on every run. Agents read all of it, every time, until the verification script compared against a baseline file and printed only the delta.</li>
+          <li><strong>Reviewers were confidently wrong twice</strong>: on route injector lifetime (two reviewers agreed with each other and with no evidence), and with a suggestion that would have been a library-to-app import. A reviewer's finding is a claim to verify, not a change to apply.</li>
+          <li><strong>Plans missed what no grep shows.</strong> Implementers blocked on the Sass partial, on barrel lines a codemod overwrote, on chunk bands. Each became a guard or a planner checklist line; none was predicted.</li>
+          <li><strong>Context runs out.</strong> Sessions were cleared at about 80 % and resumed from the ledger. The ledger has to be current for that to work, which is one more reason to keep it.</li>
+        </ul>
+      </section>
+
+      <!-- ============================================================ -->
+      <section class="section" id="results">
+        <h2 class="section__title"><span class="num">11.</span> Results, and what is still open</h2>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Measure</th><th class="num">Before</th><th class="num">After</th></tr></thead>
+            <tbody>
+              <tr><td>Nx projects / libraries</td><td class="num">1 / 0</td><td class="num">44 / 42</td></tr>
+              <tr><td>Domain folders in <code>src/app</code></td><td class="num">18</td><td class="num">0</td></tr>
+              <tr><td><code>@NgModule</code> files</td><td class="num">28</td><td class="num">0</td></tr>
+              <tr><td>Cross-scope / upward / two-way import edges</td><td class="num">16 / 10 / 10</td><td class="num">0 / 0 / 0</td></tr>
+              <tr><td>Ignored cycles in the boundaries config</td><td class="num">n/a</td><td class="num">0</td></tr>
+              <tr><td>Jest projects · tests</td><td class="num">1 · 4,431</td><td class="num">37 · 4,642</td></tr>
+              <tr><td>Jest in CI, single-domain PR</td><td class="num">117.8 s</td><td class="num">21.2 s</td></tr>
+              <tr><td>Jest in CI, docs-only PR</td><td class="num">117.8 s</td><td class="num">0 s</td></tr>
+              <tr><td>Boundaries gate in CI</td><td class="num">none</td><td class="num">~4 s, required</td></tr>
+              <tr><td>Initial bundle (Docker config)</td><td class="num">6.01 MB · 53 chunks</td><td class="num">6.25 MB · 42 chunks</td></tr>
+              <tr><td>ESLint errors (still not gated)</td><td class="num">288</td><td class="num">280</td></tr>
+              <tr><td>Lines of coverage hit</td><td class="num">18,998</td><td class="num">19,002</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p>Still open, in the order I would do them:</p>
+
+        <ul>
+          <li><strong>Three timed PRs</strong> against the 11.3-minute median. The spike numbers are from the container; the pipeline number is the one that counts.</li>
+          <li><strong><code>sideEffects: false</code></strong> on the shared libraries, with its own QA click-through, for the 4 % back and then some.</li>
+          <li><strong>The lint burn-down.</strong> 280 errors is parity, not clean. Until it is clean, <code>nx affected -t lint</code> cannot be a gate, and the per-file parity check in the verification script does the job locally.</li>
+          <li><strong>Remote cache</strong>, revisited with three months of affected numbers in hand.</li>
+          <li><strong>A <code>FEATURE.md</code> per scope</strong>: purpose, journeys, screens and routes, libraries, state, dependencies. Written on the follow-up branch, updated with every structural change, so the next person (or agent) reads nine short files instead of the graph.</li>
+        </ul>
+      </section>
+
+      <!-- ============================================================ -->
+      <section class="section" id="again">
+        <h2 class="section__title"><span class="num">12.</span> If I did it again</h2>
+
+        <ul>
+          <li><strong>Boundaries before moves.</strong> Put the rule in with the first library and let the waves run against it. Every wave that passed <code>lint:boundaries</code> was a wave I did not have to think about.</li>
+          <li><strong>Start with the relaxed scope rule.</strong> "Only feature and shell are scope-private" is where I ended, and the detour through "lift everything into shared" cost a 28-commit PR. The ladder of types is the thing that prevents coupling; scope privacy on data and UI libraries only prevents reuse.</li>
+          <li><strong>Make testing a type on day one.</strong> Generators in a folder inside a production library will leak into the production compile the first time someone widens an ignore.</li>
+          <li><strong>Zero ignored cycles, from the first config.</strong> An allowance is a cycle with a comment. The four patterns are enough.</li>
+          <li><strong>Measure the Jest split before you commit it</strong>, in the CI container, on the real PR mix. The answer is not obviously yes, and round two of ours lost coverage of 91 files without a single red test.</li>
+          <li><strong>App moves last, NgModules go first.</strong> Both are about the number of open branches you collide with.</li>
+          <li><strong>Write the guard with the rule.</strong> If you cannot name the spec or lint rule that fails when the rule is broken, you have a guideline, and guidelines do not survive the third wave.</li>
+          <li><strong>Keep the ledger.</strong> Rulings with a price, token counts per run, departures from the spec. It is how the migration survived context limits and session handovers, and it is how this article got its numbers.</li>
+        </ul>
+
+        <p>
+          One PR per phase, nothing changes on screen, the build comes out identical, and a rule is a rule
+          only if something fails. The rest is <code>git mv</code>.
+        </p>
+      </section>
+    </main>
+
+    <footer class="footer" id="contact">
+      <h2 class="footer__title">Planning a monorepo move?</h2>
+      <p class="footer__sub">
+        I do this for a living: Nx migrations, architecture reviews, and the AI-agent harness that makes a
+        restructure like this one a two-week job instead of a quarter.
+      </p>
+      <a class="btn btn--primary" href="mailto:andriisiuta@gmail.com">andriisiuta@gmail.com</a>
+      <a class="btn btn--ghost" href="/">Back to the CV</a>
+      <p class="footer__note mono">© 2026 Andrii Siuta · written with the run reports open · deployed on GitHub Pages</p>
+    </footer>
+  </div>
+</body>
+</html>
