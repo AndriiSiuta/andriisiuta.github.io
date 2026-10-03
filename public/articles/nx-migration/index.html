@@ -513,7 +513,7 @@
           each with its own screens, services and in several cases its own store. Angular 21 with standalone
           components, TypeScript 5.9, NGXS where a domain holds state, Angular Material, Jest 30, Azure
           DevOps pipelines. About 1,600 source files and 4,400 tests. A busy codebase: roughly 190 merges to
-          <code>main</code> in the six months before the migration, with four or five people committing.
+          <code>main</code> in the six months before the migration, from eight regular committers.
         </p>
 
         <p>
@@ -1385,7 +1385,7 @@
           <li><strong>Roles.</strong> An <em>investigator</em> traces a ticket end to end and writes a facts note; a <em>spec-writer</em> turns the brainstorm into a spec with acceptance criteria; a <em>planner</em> writes tagged tasks; <em>implementers</em> (one for judgement work, one for recipe work such as a routes file or a rename) each take a task brief, verify and commit from a pathspec; a <em>conventions reviewer</em> and a <em>code reviewer</em> read each new shape; a <em>PR creator</em> opens the pull request only after a human has verified the branch.</li>
           <li><strong>Tiers.</strong> A change is sized at the brainstorm: S (three files, no spec), M (one screen or contract, at most five tasks), L (a library, a cross-scope change, a wave). Every migration phase was an L.</li>
           <li><strong>Gates in one command.</strong> A verification script runs app and spec type-checks, the related Jest projects, ESLint parity against the base (no new errors on touched files, since <code>main</code> carries 288), a conventions pass (translation-key parity, added comments, added <code>eslint-disable</code>, local-only files in the commit range) and the boundaries lint. An implementer's report is rejected by a hook unless it names the files, the checks, and what it deferred.</li>
-          <li><strong>Run reports.</strong> Every L run ends with a report: what merged, every ruling with what it costs if wrong, departures from the spec, open follow-ups, and a token ledger per agent run. The reports are what made this article possible. They are also what the next planner reads.</li>
+          <li><strong>Run reports.</strong> Every L run ends with a report: what merged, every ruling with what it costs if wrong, departures from the spec, open follow-ups, and a token ledger per agent run. The reports are what made this article possible. They are also what the next planner reads. The harness itself has <a href="/articles/ai-harness/">its own write-up</a>.</li>
         </ul>
 
         <h3>The ledger</h3>

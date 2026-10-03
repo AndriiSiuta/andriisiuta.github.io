@@ -1,0 +1,1043 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>The harness: running AI agents on a production Angular codebase — Andrii Siuta</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Six weeks, 858 agent runs, about 125 million tokens, 28 run reports with per-agent ledgers. How a Claude Code harness for a production Angular monorepo is built: rules, skills, eight agent roles, hooks, a verification script, token ledgers, and the audit that cut its own cost. Built on superpowers and Matt Pocock's skills.">
+  <meta property="og:title" content="The harness: running AI agents on a production Angular codebase">
+  <meta property="og:description" content="8 agent roles, 4 hooks, a verification script, token ledgers in every run report, and the measurement that re-tiered the reviews. What worked, what cost too much, and what the six-week audit changed.">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://andriisiuta.github.io/articles/ai-harness/">
+  <meta property="article:published_time" content="2026-10-03">
+  <meta property="article:author" content="Andrii Siuta">
+  <link rel="canonical" href="https://andriisiuta.github.io/articles/ai-harness/">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚡</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #06060f;
+      --bg-card: #0d0d1c;
+      --bg-card-hover: #12122a;
+      --border: #1e1e3a;
+      --text: #d6d6e7;
+      --text-dim: #8a8aa3;
+      --heading: #f4f4fb;
+      --pink: #ff3e7f;
+      --violet: #a855f7;
+      --red: #f0060b;
+      --green: #3ddc97;
+      --gradient: linear-gradient(90deg, #f0060b 0%, #cc26d5 55%, #7702ff 100%);
+      --gradient-soft: linear-gradient(90deg, #ff3e7f 0%, #a855f7 100%);
+      --font-body: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+      --font-head: 'Space Grotesk', var(--font-body);
+      --font-mono: 'JetBrains Mono', ui-monospace, 'Fira Code', monospace;
+      color-scheme: dark;
+    }
+
+    * { box-sizing: border-box; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      margin: 0;
+      background:
+        radial-gradient(ellipse 60% 40% at 70% -10%, rgba(119, 2, 255, 0.14), transparent),
+        radial-gradient(ellipse 50% 35% at 20% 10%, rgba(255, 62, 127, 0.1), transparent),
+        var(--bg);
+      color: var(--text);
+      font-family: var(--font-body);
+      font-size: 16px;
+      line-height: 1.65;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    ::selection { background: rgba(255, 62, 127, 0.35); color: #fff; }
+
+    .mono { font-family: var(--font-mono); }
+    .accent { color: var(--pink); }
+
+    a { color: var(--pink); text-decoration: none; }
+    a:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+    .nav {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px max(16px, calc(50vw - 506px));
+      backdrop-filter: blur(12px);
+      background: rgba(6, 6, 15, 0.7);
+      border-bottom: 1px solid rgba(30, 30, 58, 0.6);
+    }
+
+    .nav__brand { font-family: var(--font-head); font-weight: 700; font-size: 1.4rem; color: var(--heading); }
+    .nav__brand:hover { text-decoration: none; }
+    .nav__links { display: flex; gap: 22px; }
+    .nav__links a { color: var(--text-dim); font-size: 0.9rem; transition: color 0.2s; }
+    .nav__links a:hover { color: var(--pink); text-decoration: none; }
+
+    .wrap { max-width: 1060px; margin: 0 auto; padding: 0 16px; }
+    .article { max-width: 760px; margin: 0 auto; }
+
+    .hero { position: relative; padding: 80px 0 40px; }
+    .hero__glow { position: absolute; border-radius: 50%; filter: blur(90px); pointer-events: none; }
+    .hero__glow--pink { width: 380px; height: 380px; top: -60px; right: -80px; background: rgba(255, 62, 127, 0.16); }
+    .hero__glow--violet { width: 300px; height: 300px; bottom: -40px; left: -100px; background: rgba(119, 2, 255, 0.16); }
+    .hero__eyebrow { color: var(--pink); font-size: 0.95rem; margin: 0 0 14px; }
+    .cursor { animation: blink 1.1s step-end infinite; }
+    @keyframes blink { 50% { opacity: 0; } }
+
+    .hero__title {
+      font-family: var(--font-head);
+      font-size: clamp(2rem, 5.2vw, 3.4rem);
+      font-weight: 700;
+      line-height: 1.08;
+      margin: 0 0 20px;
+      background: var(--gradient);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      filter: drop-shadow(0 0 24px rgba(204, 38, 213, 0.25));
+    }
+
+    .hero__dek { color: var(--text-dim); font-size: 1.12rem; line-height: 1.6; margin: 0 0 26px; max-width: 700px; }
+    .hero__meta { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; color: var(--text-dim); font-size: 0.85rem; }
+
+    .chip {
+      font-family: var(--font-mono);
+      font-size: 0.74rem;
+      color: var(--text);
+      background: rgba(168, 85, 247, 0.1);
+      border: 1px solid rgba(168, 85, 247, 0.3);
+      border-radius: 999px;
+      padding: 3px 11px;
+    }
+
+    .metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin: 30px 0 10px; }
+
+    .metric {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 18px 14px;
+      text-align: center;
+      transition: border-color 0.25s, transform 0.25s;
+    }
+
+    .metric:hover { border-color: rgba(255, 62, 127, 0.5); transform: translateY(-3px); }
+
+    .metric__value {
+      display: block;
+      font-family: var(--font-head);
+      font-size: 1.55rem;
+      font-weight: 700;
+      line-height: 1.15;
+      letter-spacing: -0.01em;
+      background: var(--gradient-soft);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      white-space: nowrap;
+    }
+
+    .metric__label { display: block; color: var(--text-dim); font-size: 0.8rem; margin-top: 6px; }
+
+    .toc { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 20px 24px; margin: 36px 0 10px; }
+    .toc__title { font-family: var(--font-mono); font-size: 0.78rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.08em; margin: 0 0 12px; }
+    .toc ol { margin: 0; padding: 0; list-style: none; columns: 2; column-gap: 28px; }
+    .toc li { margin: 0 0 7px; break-inside: avoid; font-size: 0.93rem; }
+    .toc li a { color: var(--text); }
+    .toc li a:hover { color: var(--pink); text-decoration: none; }
+    .toc .n { font-family: var(--font-mono); color: var(--pink); font-size: 0.8rem; margin-right: 8px; }
+
+    .section { padding: 54px 0 4px; }
+
+    .section__title {
+      font-family: var(--font-head);
+      font-size: 1.65rem;
+      color: var(--heading);
+      margin: 0 0 24px;
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+      line-height: 1.25;
+    }
+
+    .section__title::after { content: ''; flex: 1; height: 1px; min-width: 24px; background: linear-gradient(90deg, var(--border), transparent); }
+    .section__title .num { font-family: var(--font-mono); color: var(--pink); font-size: 1rem; flex-shrink: 0; }
+
+    h3 { font-family: var(--font-head); color: var(--heading); font-size: 1.15rem; margin: 34px 0 12px; }
+
+    p { margin: 0 0 16px; }
+    .article ul, .article ol { margin: 0 0 18px; padding-left: 22px; }
+    .article li { margin-bottom: 7px; }
+    .article li::marker { color: var(--pink); }
+    strong { color: var(--heading); font-weight: 600; }
+
+    code {
+      font-family: var(--font-mono);
+      font-size: 0.86em;
+      background: rgba(168, 85, 247, 0.1);
+      border: 1px solid rgba(168, 85, 247, 0.22);
+      border-radius: 5px;
+      padding: 1px 6px;
+      color: var(--text);
+      word-break: break-word;
+    }
+
+    pre {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 18px 20px;
+      margin: 0 0 20px;
+      overflow-x: auto;
+      font-size: 0.82rem;
+      line-height: 1.6;
+    }
+
+    pre code { background: none; border: 0; padding: 0; font-size: inherit; color: var(--text); word-break: normal; }
+
+    .pre__label { display: block; font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-dim); margin: 0 0 10px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+
+    .c { color: var(--text-dim); }
+    .s { color: var(--pink); }
+    .k { color: var(--violet); }
+
+    .pull {
+      margin: 28px 0;
+      padding: 6px 0 6px 22px;
+      border-left: 3px solid transparent;
+      border-image: var(--gradient-soft) 1;
+      font-family: var(--font-head);
+      font-size: 1.2rem;
+      line-height: 1.45;
+      color: var(--heading);
+    }
+
+    .pull p { margin: 0; }
+
+    .note { border: 1px solid var(--border); border-left: 3px solid var(--violet); border-radius: 10px; padding: 14px 18px; background: var(--bg-card); margin: 0 0 20px; font-size: 0.95rem; }
+    .note p:last-child { margin: 0; }
+    .note__tag { display: inline-block; font-family: var(--font-mono); font-size: 0.72rem; color: var(--violet); border: 1px solid rgba(168, 85, 247, 0.5); border-radius: 999px; padding: 2px 9px; margin-bottom: 8px; }
+    .note--pink { border-left-color: var(--pink); }
+    .note--pink .note__tag { color: var(--pink); border-color: rgba(255, 62, 127, 0.5); }
+    .note--green { border-left-color: var(--green); }
+    .note--green .note__tag { color: var(--green); border-color: rgba(61, 220, 151, 0.5); }
+
+    .table-wrap { overflow-x: auto; margin: 0 0 22px; border: 1px solid var(--border); border-radius: 12px; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.9rem; min-width: 480px; }
+    th, td { padding: 10px 14px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--border); }
+    th { font-family: var(--font-mono); font-weight: 600; font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-dim); background: var(--bg-card); }
+    tr:last-child td { border-bottom: 0; }
+    tbody tr:hover td { background: rgba(168, 85, 247, 0.05); }
+    td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    td:first-child code { white-space: nowrap; }
+
+    figure { margin: 26px 0 24px; }
+    figure svg { display: block; width: 100%; max-width: 100%; height: auto; }
+    figure svg text { font-family: var(--font-mono); }
+    figcaption { color: var(--text-dim); font-size: 0.86rem; margin-top: 12px; line-height: 1.5; }
+
+    .footer { text-align: center; padding: 80px 0 50px; }
+    .footer__title { font-family: var(--font-head); font-size: clamp(1.4rem, 4vw, 2rem); color: var(--heading); margin: 0 0 12px; }
+    .footer__sub { color: var(--text-dim); max-width: 520px; margin: 0 auto 26px; }
+
+    .btn { display: inline-block; padding: 12px 26px; border-radius: 8px; font-weight: 600; font-size: 0.95rem; transition: transform 0.2s, box-shadow 0.2s; }
+    .btn:hover { text-decoration: none; transform: translateY(-2px); }
+    .btn--primary { background: var(--gradient-soft); color: #fff; box-shadow: 0 0 24px rgba(255, 62, 127, 0.35); }
+    .btn--primary:hover { box-shadow: 0 0 36px rgba(168, 85, 247, 0.5); }
+    .btn--ghost { border: 1px solid var(--border); color: var(--text); margin-left: 10px; }
+    .btn--ghost:hover { border-color: var(--pink); color: var(--pink); }
+    .footer__note { margin-top: 40px; color: var(--text-dim); font-size: 0.75rem; opacity: 0.7; }
+
+    @media (max-width: 640px) {
+      .hero { padding-top: 56px; }
+      .nav__links { gap: 14px; }
+      .nav__links a { font-size: 0.8rem; }
+      .metrics { grid-template-columns: repeat(2, 1fr); }
+      .metric__value { font-size: 1.3rem; }
+      .toc ol { columns: 1; }
+      figure { overflow-x: auto; }
+      figure svg { min-width: 640px; }
+      .pull { font-size: 1.05rem; }
+      .btn--ghost { margin-left: 0; margin-top: 10px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      .cursor { animation: none; }
+      .metric, .btn { transition: none; }
+    }
+  </style>
+</head>
+<body>
+  <nav class="nav">
+    <a class="nav__brand" href="/">AS<span class="accent">.</span></a>
+    <div class="nav__links">
+      <a href="/">CV</a>
+      <a href="/articles/">Writing</a>
+      <a href="https://github.com/AndriiSiuta" target="_blank" rel="noopener">GitHub</a>
+      <a href="https://www.linkedin.com/in/andrii-siuta/" target="_blank" rel="noopener">LinkedIn</a>
+    </div>
+  </nav>
+
+  <div class="wrap">
+    <header class="hero">
+      <div class="hero__glow hero__glow--pink"></div>
+      <div class="hero__glow hero__glow--violet"></div>
+      <p class="hero__eyebrow mono">$ cat articles/ai-harness.md<span class="cursor">▊</span></p>
+      <h1 class="hero__title">The harness: running AI agents on a production Angular codebase</h1>
+      <p class="hero__dek">
+        Six weeks, 858 agent runs, about 125 million tokens, 28 run reports with a per-agent ledger in each.
+        This is how the Claude Code harness behind the <a href="/articles/nx-migration/">Nx migration</a> is
+        built: rules, skills, eight agent roles, four hooks, one verification script, and the habit of writing
+        down every ruling with what it costs if wrong. What it stands on, what it measures, what the audit
+        found when it turned the measurements on itself, and what I would not build again.
+      </p>
+      <div class="hero__meta">
+        <span>Andrii Siuta</span>
+        <span>·</span>
+        <span>October 2026</span>
+        <span>·</span>
+        <span>~25 min read</span>
+        <span class="chip">Claude Code</span>
+        <span class="chip">superpowers</span>
+        <span class="chip">Matt Pocock skills</span>
+        <span class="chip">Angular</span>
+        <span class="chip">Nx</span>
+      </div>
+
+      <div class="metrics" aria-label="Key numbers">
+        <div class="metric"><span class="metric__value">8 roles</span><span class="metric__label">subagents, model and effort per role</span></div>
+        <div class="metric"><span class="metric__value">858 runs</span><span class="metric__label">agent dispatches in six weeks</span></div>
+        <div class="metric"><span class="metric__value">≈ 125 M</span><span class="metric__label">subagent tokens, ledgered</span></div>
+        <div class="metric"><span class="metric__value">28</span><span class="metric__label">run reports with rulings and a ledger</span></div>
+        <div class="metric"><span class="metric__value">4 hooks</span><span class="metric__label">deterministic guards, exit 2 blocks</span></div>
+        <div class="metric"><span class="metric__value">11.5k → 3k</span><span class="metric__label">words loaded every turn, after the audit</span></div>
+      </div>
+    </header>
+
+    <main class="article">
+      <nav class="toc" aria-label="Contents">
+        <p class="toc__title">Contents</p>
+        <ol>
+          <li><span class="n">01</span><a href="#what">What a harness is</a></li>
+          <li><span class="n">02</span><a href="#shoulders">The layer I did not write</a></li>
+          <li><span class="n">03</span><a href="#roles">Rules, skills and eight roles</a></li>
+          <li><span class="n">04</span><a href="#workflow">The workflow: tiers and dispatch</a></li>
+          <li><span class="n">05</span><a href="#gates">Gates, not prose</a></li>
+          <li><span class="n">06</span><a href="#reviews">Review economics</a></li>
+          <li><span class="n">07</span><a href="#ledger">Run reports, ledgers, handovers</a></li>
+          <li><span class="n">08</span><a href="#audit">The audit: what six weeks of sediment looks like</a></li>
+          <li><span class="n">09</span><a href="#git">Keeping the harness out of git</a></li>
+          <li><span class="n">10</span><a href="#cost">What it cost, what it bought</a></li>
+          <li><span class="n">11</span><a href="#failures">Failure modes, recorded</a></li>
+          <li><span class="n">12</span><a href="#principles">Principles, and what is next</a></li>
+        </ol>
+      </nav>
+
+      <!-- ============================================================ -->
+      <section class="section" id="what">
+        <h2 class="section__title"><span class="num">01.</span> What a harness is</h2>
+
+        <p>
+          A chat window with a good model in it will write you a component. It will not move 1,600 files
+          across 42 libraries while four colleagues keep merging, and it will not tell you afterwards what
+          that cost or which of its own suggestions were wrong. The difference is not the model. It is
+          everything around the model that decides what it knows, what it may do, what has to be true before
+          it is allowed to say "done", and what gets written down.
+        </p>
+
+        <p>I call that a harness. Mine has seven layers, and the article walks through them in order:</p>
+
+        <ul>
+          <li><strong>Rules</strong>: instruction files loaded every turn, or when a path is touched. Invariants only, present tense, one home per fact.</li>
+          <li><strong>Skills</strong>: knowledge loaded on demand by a trigger. Some I wrote, most I did not (<a href="#shoulders">section 2</a>).</li>
+          <li><strong>Agents</strong>: eight roles, each with its own model, effort, tool list, preloaded skills and a report contract.</li>
+          <li><strong>Hooks</strong>: deterministic scripts on tool events. They block; they do not advise.</li>
+          <li><strong>Tools</strong>: a verification script that runs every gate in one command, a ledger summariser, a dead-path checker.</li>
+          <li><strong>Record</strong>: specs, plans, ADRs, run reports with token ledgers, an append-only progress file per run, a handover document when a session has to stop.</li>
+          <li><strong>Memory</strong>: a small file-per-fact store for rulings, machine facts and diagnostic recipes. Never for ticket state.</li>
+        </ul>
+
+        <figure>
+          <svg viewBox="0 0 760 400" role="img" aria-label="The harness: a human gives briefs and rulings to a dispatcher session; the dispatcher sends task briefs to eight subagent roles and receives hook-checked reports; gates (hooks and a verification script) sit on every tool call and every stop; knowledge (rules, skills, memory, ADRs) is loaded into every session; the record (run report, ledger, progress file, handover) is written as work happens; a third-party layer of skills and read-only MCP servers feeds the knowledge layer.">
+            <defs>
+              <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+              </marker>
+            </defs>
+            <g fill="#0d0d1c" stroke="currentColor" stroke-width="1.2">
+              <rect x="20" y="10" width="170" height="76" rx="8"/>
+              <rect x="230" y="10" width="190" height="76" rx="8"/>
+              <rect x="490" y="10" width="250" height="100" rx="8"/>
+              <rect x="20" y="170" width="170" height="88" rx="8"/>
+              <rect x="230" y="170" width="190" height="88" rx="8"/>
+              <rect x="490" y="170" width="250" height="88" rx="8"/>
+              <rect x="20" y="314" width="720" height="62" rx="8" stroke-dasharray="5 4"/>
+            </g>
+            <g fill="currentColor" font-size="13" text-anchor="middle">
+              <text x="105" y="36">Human</text>
+              <text x="325" y="36">Dispatcher session</text>
+              <text x="615" y="34">Subagents · 8 roles</text>
+              <text x="105" y="196">Knowledge</text>
+              <text x="325" y="196">Gates</text>
+              <text x="615" y="196">Record</text>
+              <text x="380" y="338">Third-party layer</text>
+            </g>
+            <g fill="#8a8aa3" font-size="10.5" text-anchor="middle">
+              <text x="105" y="56">rulings · verification</text>
+              <text x="105" y="72">opens the PR</text>
+              <text x="325" y="56">brainstorm · dispatch</text>
+              <text x="325" y="72">rulings · run report</text>
+              <text x="615" y="56">investigator · spec-writer</text>
+              <text x="615" y="74">planner · 2 implementers</text>
+              <text x="615" y="92">2 reviewers · pr-creator</text>
+              <text x="105" y="218">rules · skills · memory</text>
+              <text x="105" y="236">ADRs · specs · plans</text>
+              <text x="325" y="218">hooks on calls and stops</text>
+              <text x="325" y="236">verify: 8 steps, exit 1</text>
+              <text x="615" y="218">run report + token ledger</text>
+              <text x="615" y="236">progress.md · handover</text>
+              <text x="380" y="360">superpowers · Matt Pocock skills · Angular team skill · Nx plugin · typescript-lsp · read-only MCP</text>
+            </g>
+            <g stroke="currentColor" stroke-width="1.3" fill="none" marker-end="url(#arr)">
+              <line x1="190" y1="48" x2="228" y2="48"/>
+              <line x1="420" y1="40" x2="488" y2="40"/>
+              <line x1="488" y1="64" x2="422" y2="64" stroke-dasharray="4 4"/>
+              <line x1="325" y1="86" x2="325" y2="168"/>
+              <line x1="615" y1="110" x2="615" y2="168"/>
+              <path d="M105,168 C105,120 200,112 250,88" stroke-dasharray="4 4"/>
+              <line x1="105" y1="314" x2="105" y2="260"/>
+            </g>
+            <g fill="#8a8aa3" font-size="10" text-anchor="middle">
+              <text x="209" y="41">brief</text>
+              <text x="454" y="32">task brief</text>
+              <text x="454" y="79">report</text>
+            </g>
+            <g fill="#8a8aa3" font-size="10" text-anchor="start">
+              <text x="333" y="132">every call · every stop</text>
+              <text x="623" y="142">reports · ledger rows</text>
+              <text x="120" y="160">loaded into every session</text>
+              <text x="118" y="292">skills on demand · servers by name</text>
+            </g>
+          </svg>
+          <figcaption>
+            The human never talks to a subagent; the dispatcher session does, with a brief it assembles
+            from the plan. Gates sit on every tool call and every agent stop. The record is written as work
+            happens, not afterwards.
+          </figcaption>
+        </figure>
+      </section>
+
+      <!-- ============================================================ -->
+      <section class="section" id="shoulders">
+        <h2 class="section__title"><span class="num">02.</span> The layer I did not write</h2>
+
+        <p>
+          Most of the process knowledge in this harness is other people's, installed as Claude Code plugins
+          and switched on or off per skill. The repository-specific layer on top is thin on purpose: it says
+          where this repo departs from the generic skill, and nothing the generic skill already says.
+        </p>
+
+        <h3>superpowers</h3>
+
+        <p>
+          Jesse Vincent's <em>superpowers</em> plugin is the spine of the workflow. <code>brainstorming</code>
+          runs before any design work and refuses to start implementation until a design is approved.
+          <code>writing-plans</code> is what the planner agent invokes, with two repo overrides (specs are
+          written alongside, and tasks carry this repo's tags). <code>subagent-driven-development</code> is
+          the dispatch loop, and its <code>task-brief</code> script is how a brief is assembled: the plan's
+          header block plus one task's section, never a path to the plan. <code>test-driven-development</code>,
+          <code>systematic-debugging</code>, <code>verification-before-completion</code> ("evidence before
+          assertions") and <code>using-git-worktrees</code> are used as they ship. The rule that a skill is
+          invoked before any response, even a clarifying question, is also theirs, and it is what makes the
+          rest of the stack fire reliably.
+        </p>
+
+        <h3>Matt Pocock's skills</h3>
+
+        <p>
+          Matt Pocock's skill set covers the parts of engineering that happen before and around code, and
+          four of them shaped how this harness keeps its record:
+        </p>
+
+        <ul>
+          <li><strong><code>domain-modeling</code></strong> gives the repo its document layout: a single-context <code>CONTEXT.md</code> (here still carried by the rules file until it exists) and sequentially numbered ADRs under <code>docs/adr/</code>. The eleven ADRs in this harness follow its shape, and the rule "if a piece of work would contradict an ADR, say so and ask, never override silently" is its discipline.</li>
+          <li><strong><code>research</code></strong> is the pattern behind the 68 research notes: a background agent investigates a question against primary sources, every claim carries its source, and the note lands where the repo already keeps such notes. The Nx improvements survey, the architecture review against Manfred Steyer's published material, and the AI-tooling survey were all written this way.</li>
+          <li><strong><code>writing-for-agents</code></strong> is the reference I reach for whenever a rule file or an agent prompt is edited. Its vocabulary (context load versus cognitive load, a pointer per branch, progressive disclosure, "cut identity the body already carries") is the vocabulary the audit in <a href="#audit">section 8</a> used to cut the always-loaded layer from 11,500 words to under 3,000.</li>
+          <li><strong><code>grilling</code></strong> (and <code>grill-with-docs</code>) is the design-tree interview: rounds of questions, each with a recommended answer, until nothing is silently assumed. It is how the bigger specs got their open-decisions list down to three or fewer before the spec-writer ran.</li>
+        </ul>
+
+        <p>
+          <code>prototype</code>, <code>codebase-design</code> (deep modules, where a seam goes),
+          <code>resolving-merge-conflicts</code>, <code>wizard</code> and <code>handoff</code> are on and used
+          when they fit. Three of his skills are deliberately switched off: <code>tdd</code> and
+          <code>diagnosing-bugs</code> overlap superpowers' versions, and his <code>code-review</code> overlaps
+          the official plugin's; two skills with the same trigger is one skill firing at random.
+        </p>
+
+        <h3>Framework and tooling skills</h3>
+
+        <ul>
+          <li>The <strong>Angular team's <code>angular-developer</code></strong> skill (forty reference files: signals, <code>resource</code>, <code>linkedSignal</code>, signal forms) is preloaded into the implementer agent, so the generic Angular guidance costs nothing per task to look up.</li>
+          <li>The <strong>Nx plugin's</strong> <code>nx-workspace</code> and <code>nx-generate</code> skills replaced a hand-written library census: the list of projects by tag is one <code>nx show projects</code> away and is never restated in a document. Nx's own stance, "skills for knowledge, MCP for connectivity", is the rule here too.</li>
+          <li>Two vendored MIT skills for <strong>accessibility and performance</strong> (WCAG 2.2 AA, measure-first) are used for design-system work.</li>
+          <li>The official <strong><code>code-review</code></strong> plugin runs once per branch; <strong><code>typescript-lsp</code></strong> gives diagnostics after every edit and real go-to-definition across 43 projects instead of grep; <strong>Context7</strong> answers library-version questions.</li>
+          <li><strong>MCP servers</strong>, all read-only in effect: the Angular CLI server (docs search, the OnPush migration tool), Azure DevOps (work items, repositories, PR threads; its six write tools are denied so the shell's "no pipeline queueing" rule cannot be bypassed through a different door), Figma, SonarQube.</li>
+        </ul>
+
+        <blockquote class="pull"><p>The repo layer says where this codebase departs from the generic skill. It never repeats what the generic skill already says.</p></blockquote>
+      </section>
+
+      <!-- ============================================================ -->
+      <section class="section" id="roles">
+        <h2 class="section__title"><span class="num">03.</span> Rules, skills and eight roles</h2>
+
+        <h3>Rules</h3>
+
+        <p>
+          Four files are loaded every turn: the global preferences (138 words), the tracked persona the team
+          wrote (324), the local rules file (2,170 words, ten numbered rules and a table of what each
+          unmerged branch adds), and a shell-rules file (319) that carries the git and process invariants. A
+          fifth, the web rules (945), loads only when a file under <code>apps/</code> or <code>libs/</code> is
+          read or edited. Every one of them is present tense and describes the checkout, not a branch. That
+          sentence sounds obvious; <a href="#audit">section 8</a> is about how it stopped being true.
+        </p>
+
+        <h3>Repo skills</h3>
+
+        <p>
+          Five skills are repo-authored: <code>web-conventions</code> (where things live, the rules this repo
+          adds, where it departs from the generic skills, a done-when list; 4,200 words plus eleven reference
+          files), <code>typescript-style</code> (the recipe table: union states for loaded data, no loose null
+          checks, <code>as const satisfies</code> for configs, pure sort and search helpers),
+          <code>ado-conventions</code> (how to read and write the issue tracker, commit and PR style),
+          <code>writing-feature-spec</code> (two templates and a 1,500-word cap) and <code>syncing-docs</code>
+          (a diff-to-document mapping, run before every PR). Each has a trigger sentence that names the
+          situation, because a skill that does not fire is a document nobody reads.
+        </p>
+
+        <h3>Eight roles</h3>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Agent</th><th>Effort</th><th>Tools</th><th>Preloaded</th><th>Must return</th></tr></thead>
+            <tbody>
+              <tr><td>investigator</td><td>high</td><td>read, grep, glob, git reads, spawn</td><td>investigating-codebase, tracker conventions</td><td>a one-page facts note: files, flow, constraints; no code, no offer to implement</td></tr>
+              <tr><td>spec-writer</td><td>medium</td><td>read, write under docs/ only</td><td>writing-feature-spec, diagrams, ADRs</td><td>spec path, specs amended, open decisions (more than three means the brainstorm is not finished)</td></tr>
+              <tr><td>planner</td><td>high</td><td>read, write the plan file only</td><td>web-conventions, typescript-style, angular-architecture</td><td>plan path and a task list with tags; at most 300 words per task, 12 tasks per plan</td></tr>
+              <tr><td>implementer</td><td>inherits</td><td>all</td><td>angular-developer, web-conventions, typescript-style</td><td><code>Files:</code> <code>Checks:</code> <code>Deferred:</code> <code>Plan edits:</code> or <code>Blocked:</code>, hook-enforced</td></tr>
+              <tr><td>mechanical implementer</td><td>inherits</td><td>all</td><td>web-conventions, typescript-style (no generic Angular preload)</td><td>the same contract; for tasks whose brief carries the complete code or an exact copy rule</td></tr>
+              <tr><td>conventions reviewer</td><td>—</td><td>read-only</td><td>web-conventions, typescript-style</td><td>a fixed 16-row checklist and a verdict; the mechanical rows are <code>n/a</code> because the verification script owns them</td></tr>
+              <tr><td>code reviewer</td><td>—</td><td>read-only</td><td>none, deliberately</td><td>an 11-row "second file" table: the translation twin, the flag's getter, the action's handler, the route's title key; verdict <em>paired / one file missing / request changes</em></td></tr>
+              <tr><td>pr-creator</td><td>—</td><td>read, git, tracker CLI</td><td>tracker conventions</td><td>the PR URL and title, after a five-step preflight; it runs only when told a human verified the branch</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p>
+          Three things in that table do most of the work. <strong>Model and effort live in the agent's
+          frontmatter and nowhere else</strong>; after the audit the three document-writing roles moved off
+          the most expensive model, and the spec-writer dropped to medium effort because, in its own
+          prompt's words, "you write down decisions that are already made; you do not design".
+          <strong>The code reviewer preloads nothing</strong>, because loading the conventions skill would
+          pull it onto the other reviewer's checklist and the two would find the same things twice.
+          <strong>Every report is a contract</strong>: the implementer's four headings are checked by a hook on
+          the agent's stop event, and a report missing <code>Deferred:</code> is sent back. Manual checks used
+          to be deferred silently; now the dispatcher sees the word every time.
+        </p>
+
+<pre><span class="pre__label">an agent's frontmatter, the shape</span><code>---
+name: spec-writer
+description: Turns a read ticket and an agreed approach into a spec under docs/, and reports the path plus the open decisions.
+model: opus
+effort: medium
+tools: Read, Grep, Glob, Bash, Write, Edit
+skills: writing-feature-spec, drawing-architecture-diagrams, writing-adr
+---</code></pre>
+      </section>
+
+      <!-- ============================================================ -->
+      <section class="section" id="workflow">
+        <h2 class="section__title"><span class="num">04.</span> The workflow: tiers and dispatch</h2>
+
+        <div class="note note--pink">
+          <span class="note__tag">challenge</span>
+          <p>
+            For the first five weeks there was one pipeline for every size of change. A three-agent fix cost
+            246k tokens because it still went through investigator, spec, plan, two reviewers and a docs
+            sync. A lint-config change cost 550k. The pipeline floor was the price of any ticket.
+          </p>
+        </div>
+
+        <div class="note note--green">
+          <span class="note__tag">how we solved it</span>
+          <p>Three tiers, sized at the brainstorm and written into the rules:</p>
+        </div>
+
+        <ul>
+          <li><strong>S</strong>: at most three files, no new copy, no contract change. The main session or one implementer, the official code review, a human verifies, the PR is opened. No spec, no plan; the run is one line in a monthly file.</li>
+          <li><strong>M</strong>: one screen or one contract, no new library. The ticket plus the brainstorm decisions in the brief stand in for the spec; the planner writes at most five tasks; one reviewer per new shape.</li>
+          <li><strong>L</strong>: a new library, a cross-scope change, a wave of components. Investigator → brainstorm → spec-writer → planner → implementers → reviews → docs sync → a human verifies by hand → pr-creator. Every migration phase in the <a href="/articles/nx-migration/">first article</a> was an L.</li>
+        </ul>
+
+        <h3>Dispatch</h3>
+
+        <p>
+          The dispatcher is the main session. It never implements an L task itself; it assembles briefs,
+          reads reports, makes rulings and writes them down. The rules it follows:
+        </p>
+
+        <ul>
+          <li><strong>The brief is the plan's header block plus the task's section.</strong> The header carries the verification command, the commit recipe, the message rule and the report format once; a task never repeats them. An agent is never handed a path to the plan, because it would read all of it.</li>
+          <li><strong>Same-shape tasks are one dispatch</strong> with a per-unit table and one commit per unit. An implementer run costs about 70k tokens before it touches a file, so ten five-minute renames as ten dispatches is 700k tokens of start-up.</li>
+          <li><strong>Parallel only when nothing is shared.</strong> Two tasks run side by side only if they share no file and no measured number; the two translation files count as shared. A shared file no check guards is committed once by the dispatcher after the wave.</li>
+          <li><strong>One working tree, pathspec commits.</strong> Implementers share a checkout and commit with <code>git commit --only -- &lt;paths&gt;</code>, never a bare commit, so two agents' half-edits never land in each other's commits.</li>
+          <li><strong>An implementer that changes a shape a later task depends on edits that task in the plan</strong>, and says so under <code>Plan edits:</code>.</li>
+          <li><strong>Manual checks batch</strong> into one click-through list at the end of the branch, done by a human.</li>
+          <li><strong>Ask before</strong> adding a dependency, changing the lint config or the test runner, restructuring a domain folder, or queueing any pipeline. A queued build is outward-facing and is not the agent's call.</li>
+          <li><strong>A PR opens only after a human has verified the change.</strong> The pr-creator's preflight checks that it is not on main, the tree is clean, commits exist, no local-only file is in the range and no PR is already open. It once refused a generalised "go on" because the verification step had not been named.</li>
+        </ul>
+      </section>
+
+      <!-- ============================================================ -->
+      <section class="section" id="gates">
+        <h2 class="section__title"><span class="num">05.</span> Gates, not prose</h2>
+
+        <p>
+          A rule an agent might forget is a rule a script should hold. The harness has two kinds of script:
+          a verification command every implementer runs before it may report, and hooks the platform runs
+          on tool events whether anyone remembers or not.
+        </p>
+
+        <h3>One command, eight steps</h3>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>#</th><th>Step</th><th>Compared against</th><th>Fails when</th></tr></thead>
+            <tbody>
+              <tr><td class="num">1</td><td>Type-check the app</td><td>zero</td><td>any error</td></tr>
+              <tr><td class="num">2</td><td>Type-check the specs, plus every library's own tsconfig</td><td>a baseline file keyed on file, code and message (line numbers ignored)</td><td>a <em>new</em> error; the 53 pre-existing ones are not printed</td></tr>
+              <tr><td class="num">3</td><td><code>strictNullChecks</code> on the app</td><td>a list of folders that are already clean</td><td>an error inside a listed folder; a folder at zero joins the list and never leaves it</td></tr>
+              <tr><td class="num">4</td><td>Jest, related tests only</td><td>—</td><td>a red test in anything that imports a touched file</td></tr>
+              <tr><td class="num">5</td><td>Module boundaries lint</td><td>the tag table</td><td>an upward or cross-layer import, a cycle</td></tr>
+              <tr><td class="num">6</td><td>ESLint parity per touched file</td><td>the base branch's version of the same file, linted through stdin</td><td>any rule whose count grew; a new file must be clean. Lint is parity, not zero: <code>main</code> carries about 280 errors</td></tr>
+              <tr><td class="num">7</td><td>Conventions (70 ms, zero tokens)</td><td>the base branch</td><td>a translation key missing in one language, an added comment, an added <code>eslint-disable</code>, a new component without OnPush or the prefix, AI attribution in a commit message, a stale reference to a moved file, a local-only file in the commit range</td></tr>
+              <tr><td class="num">8</td><td>Production build (on demand)</td><td>—</td><td>only when a config, route or style entry file changed; otherwise once per branch</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p>
+          Two of those rows are ratchets, and ratchets are the most useful shape of gate I know. The spec
+          type-check baseline means an agent sees only the errors it introduced, not the 104 lines of
+          pre-existing noise that, before the baseline existed, every agent read in full on every run. The
+          strict-null folder list means strictness only ever grows: 1,218 errors in 233 files on the day the
+          ratchet started, eight folders clean today, none of them ever allowed to regress.
+        </p>
+
+        <div class="note note--pink">
+          <span class="note__tag">challenge</span>
+          <p>
+            Row 7 used to be rows in a reviewer's checklist. Translation-key parity, added comments, a
+            trailer in the commit message: an agent reading a diff for them is slow, costs tokens and misses
+            some. The conventions reviewer spent 434k tokens on one run and changed nothing.
+          </p>
+        </div>
+
+        <div class="note note--green">
+          <span class="note__tag">how we solved it</span>
+          <p>
+            Every mechanical row moved into the verification script, where it costs 70 milliseconds and
+            cannot be skipped. The reviewer's checklist now marks those rows <code>n/a</code> and keeps only
+            the judgement rows: placement, the signals contract, TypeScript style.
+          </p>
+        </div>
+
+        <h3>Four hooks</h3>
+
+<pre><span class="pre__label">hook wiring, the shape</span><code>{
+  <span class="s">"hooks"</span>: {
+    <span class="s">"PreToolUse"</span>:  [{ <span class="s">"matcher"</span>: <span class="s">"Bash"</span>,                        <span class="s">"hooks"</span>: [<span class="s">"git-guard.mjs"</span>] }],
+    <span class="s">"PostToolUse"</span>: [{ <span class="s">"matcher"</span>: <span class="s">"Edit|Write"</span>,                  <span class="s">"hooks"</span>: [<span class="s">"prettier.sh"</span>] }],
+    <span class="s">"SubagentStop"</span>: [
+      { <span class="s">"matcher"</span>: <span class="s">"web-implementer(-mechanical)?"</span>, <span class="s">"hooks"</span>: [<span class="s">"implementer-report.mjs"</span>] },
+      { <span class="s">"matcher"</span>: <span class="s">"spec-writer"</span>,                   <span class="s">"hooks"</span>: [<span class="s">"spec-cap.mjs"</span>] }
+    ]
+  }
+}</code></pre>
+
+        <ul>
+          <li><strong>git-guard</strong>, before any shell command: if the command commits or pushes, resolve the directory it runs in (a leading <code>cd</code> or <code>git -C</code> counts), read the branch, and block a commit or push on <code>main</code>, a commit that names a local-only harness path, or a push whose range carries one. Exit 2, with the reason. This replaced four paragraphs of prose that four files repeated.</li>
+          <li><strong>prettier</strong>, after every edit or write, skipping the docs and harness folders. Formatting is never a review finding.</li>
+          <li><strong>implementer-report</strong>, when an implementer stops: the last message must carry the four headings, or the agent is sent back to finish.</li>
+          <li><strong>spec-cap</strong>, when the spec-writer stops: today's spec files are word-counted, tables included, and 1,500 is the limit. A prose cap no hook checked is what produced a 16,800-word spec.</li>
+        </ul>
+
+        <h3>The deny list</h3>
+
+        <p>
+          Twenty-one denied commands, each with an incident behind it. <code>pkill -f</code> and
+          <code>pgrep -f</code>, because a pattern like <code>ng serve</code> matches the shell running the
+          command and kills the tool call; that happened 181 times in one week before the rule. <code>git reset
+          --hard</code>, because one moved the wrong branch in a checkout shared with other sessions; every
+          commit, push or reset now runs <code>git branch --show-current</code> in the same command. Stash
+          pop, drop and clear, because the stashes hold uncommitted local tooling and the indices shift.
+          <code>rm -rf</code>. Any command that queues a pipeline. And the six write tools of the issue-tracker
+          MCP server, because a shell deny list does not cover MCP tool names, and a rule with a second door
+          is not a rule.
+        </p>
+      </section>
+
+      <!-- ============================================================ -->
+      <section class="section" id="reviews">
+        <h2 class="section__title"><span class="num">06.</span> Review economics</h2>
+
+        <p>
+          Every run report ends with a ledger, and the ledger has two columns most harnesses do not keep:
+          <em>findings that changed code</em> and <em>findings later refuted</em>. The first report, on
+          2026-09-17, said why: "the ratio of code-changing findings per 100k tokens, per agent type, is the
+          number to steer the review budget by." It took five weeks to act on it.
+        </p>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Reviewer</th><th class="num">Runs</th><th class="num">Tokens</th><th class="num">Code-changing findings / 100k</th></tr></thead>
+            <tbody>
+              <tr><td>Conventions reviewer (per task)</td><td class="num">124</td><td class="num">12.0 M</td><td class="num">1.29</td></tr>
+              <tr><td>Code reviewer (per task)</td><td class="num">125</td><td class="num">10.3 M</td><td class="num">0.89</td></tr>
+              <tr><td>Generic task reviewers (per task)</td><td class="num">23</td><td class="num">2.4 M</td><td class="num">0.00 – 0.48</td></tr>
+              <tr><td>Official code review (once per branch)</td><td class="num">19</td><td class="num">3.1 M</td><td class="num">3.4 – 3.9</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p>
+          The two custom reviewers cost 22.3 million tokens for 247 code-changing findings. The one review
+          that reads the whole branch at the end, scoped to the files that carry logic, finds three to four
+          times as much per token. In the migration's CI story the gap was 0.31 against 4.76.
+        </p>
+
+        <blockquote class="pull"><p>A reviewer under 1.0 code-changing findings per 100k tokens over two consecutive runs leaves the per-task dispatch.</p></blockquote>
+
+        <p>
+          That is now a rule, and the tiering follows from it. A task that introduces a new shape gets the
+          conventions reviewer (judgement rows only) and the code reviewer. Repeats of a shape get one
+          batched pass per wave. The whole-branch review runs once. The mechanical rows went into the
+          verification script (<a href="#gates">section 5</a>). What the ledger also shows is where reviewers
+          are worth it: the "second file" reviewer, which looks only for the file a diff forgot (the other
+          language's translation key, the feature flag's getter, the action's handler), finds real omissions
+          on new shapes and nothing on repeats, which is exactly what you would want it to do.
+        </p>
+
+        <p>
+          And reviewers are sometimes wrong with confidence. Two of them agreed with each other that two
+          lazy-load sites of the same feature share one injector; a throwaway spec of under a thousand tokens
+          refuted both. Eight findings of one whole-branch review on the shared rework were refuted on
+          inspection. The ledger's second column exists so that a reviewer's finding is treated as a claim to
+          verify, not a change to apply.
+        </p>
+      </section>
+
+      <!-- ============================================================ -->
+      <section class="section" id="ledger">
+        <h2 class="section__title"><span class="num">07.</span> Run reports, ledgers, handovers</h2>
+
+        <p>Every M or L run ends with a report under the research folder. By convention it carries:</p>
+
+        <ul>
+          <li><strong>Outcome</strong>: what merged, the commits, the acceptance criteria and how each was proven.</li>
+          <li><strong>Rulings, in order, each with what it costs if wrong.</strong> "Tasks 1–3 run in parallel in the one shared tree; costs a transient verify failure on another task's half-edit, re-run." The cost clause is cheap to write and is what made two architecture rules easy to reverse later: the price of the original rule had been written down when it was made.</li>
+          <li><strong>Departures from the spec</strong>, named, so the spec can be amended by appending rather than rewritten.</li>
+          <li><strong>Deferred</strong>: the click-through list for a human.</li>
+          <li><strong>Tool-shell facts for the next run</strong>: that the Nx daemon's graph goes stale after a rename, that lint-staged after a pathspec commit leaves the index dirty, that the coverage folder is root-owned when the container writes it.</li>
+          <li><strong>The token ledger</strong>: one row per agent run with model, task, tokens, tool uses, wall time, findings that changed code, findings refuted. A 48-line script totals it by agent type and prints findings per 100k.</li>
+        </ul>
+
+        <p>
+          The dispatcher's own context is never in the ledger, and a resumed agent reports a cumulative
+          total, so raw sums overstate. One run's raw 14.2 million tokens was 9.2 million after
+          de-duplication; the 125 million in the headline is the raw figure, and the reports say so.
+        </p>
+
+        <h3>Resuming</h3>
+
+        <div class="note note--pink">
+          <span class="note__tag">challenge</span>
+          <p>
+            A dispatching session hit its context limit in the middle of a multi-lane upgrade. Claude Code's
+            automatic compaction at 94 % produced a summary, and the summary had lost the agent ids, the
+            exact rulings and which commits already existed. The next session re-dispatched a task whose
+            commit was already on the branch.
+          </p>
+        </div>
+
+        <div class="note note--green">
+          <span class="note__tag">how we solved it</span>
+          <p>
+            Two artefacts and one rule. Each run has an append-only <code>progress.md</code>: the plan, the
+            spec, the branch and base commit, a pre-flight table of what each task produces and consumes,
+            then one line per task (<code>DONE</code>, <code>DONE_WITH_CONCERNS</code>, <code>BLOCKED</code>,
+            with commit hashes and verify counts) interleaved with rulings as they are made. A handover
+            document, written when a session must stop, carries the git state per lane, the agents that were
+            running, a numbered resume procedure and the line "never re-dispatch a task whose commit already
+            exists". And the rule: stop at 80 % of context and start a new session from the ledger, never let
+            compaction decide what to keep.
+          </p>
+        </div>
+      </section>
+
+      <!-- ============================================================ -->
+      <section class="section" id="audit">
+        <h2 class="section__title"><span class="num">08.</span> The audit: what six weeks of sediment looks like</h2>
+
+        <p>
+          On 2026-10-03, with 28 run reports behind it, the harness was audited the way it audits code: the
+          always-loaded files read in full, three subagents sweeping for staleness, duplication and
+          contradiction, and the ledger script run over every report. The verdict was fair: unusually well
+          instrumented, and three things had grown past the point where they cost more than they returned.
+        </p>
+
+        <h3>A. The rules described a branch, not the checkout</h3>
+
+        <div class="note note--pink">
+          <span class="note__tag">challenge</span>
+          <p>
+            The harness lives in the main checkout, and the work lived on a stack of unmerged branches. The
+            rules file had been kept current for the furthest branch. A session starting on <code>main</code>
+            was briefed for a different codebase: 17 of 91 cited paths did not exist, and five version facts
+            were wrong.
+          </p>
+        </div>
+
+        <div class="note note--green">
+          <span class="note__tag">how we solved it</span>
+          <p>
+            The always-loaded files describe <code>main</code> only. One table at the top carries the stack:
+            branch, what it adds on top of the row above, where that is written down. When a branch merges,
+            its row is deleted and the rules it introduced are written in the present tense. A dead-path
+            checker runs over every backticked path in the harness and fails on a missing one.
+          </p>
+        </div>
+
+        <h3>B. Fifteen facts in six to twelve places, thirteen of them disagreeing</h3>
+
+        <div class="note note--pink">
+          <span class="note__tag">challenge</span>
+          <p>
+            The library count appeared as 35, 37, 41, 42, 43, 44 and 46 in different files. There were three
+            different commit syntaxes across three agent prompts. One agent prompt said "nothing in this repo
+            enforces layer direction" a week after the boundaries gate went into CI. Every rule change had
+            become a six-file edit that missed one, and an agent picked whichever copy it read last.
+          </p>
+        </div>
+
+        <div class="note note--green">
+          <span class="note__tag">how we solved it</span>
+          <p>
+            One home per fact. The rules file went from 5,362 words of changelog to 2,170 words of
+            present-tense rules; the web rules from 2,912 to 945; the history moved to a dated research note.
+            Counts and alias lists are environment facts, printed by a command and never restated. Agent
+            prompts name a rule; they never repeat it.
+          </p>
+        </div>
+
+        <h3>C. Four agents re-read what they already had</h3>
+
+        <p>
+          Non-fork subagents receive the instruction hierarchy automatically. Four prompts nevertheless began
+          with "read the rules file first". That was about 11k tokens per run, roughly 200 runs, about 2.2
+          million tokens for nothing. Four sentences deleted.
+        </p>
+
+        <h3>D and E. The document writers were the expensive stage</h3>
+
+        <div class="note note--pink">
+          <span class="note__tag">challenge</span>
+          <p>
+            The spec-writer ran on the most expensive model at the highest effort, 104k to 614k tokens per
+            spec, and five specs ran to 10,000 – 16,800 words against a 600-word prose cap nobody enforced.
+            The planner cost 19.8 million tokens across 45 runs, 2,100 – 3,600 words per task, 99 % prose,
+            each task restating the verification command, the commit recipe and the report format that the
+            brief script already prepends. The three document roles were 22 % of all tokens.
+          </p>
+        </div>
+
+        <div class="note note--green">
+          <span class="note__tag">how we solved it</span>
+          <p>
+            Model and effort by role: the spec-writer to a cheaper model at medium effort, since it
+            transcribes decisions already made; the planner to high effort with a 300-word cap per task and
+            12 tasks per plan, boilerplate once in the header. A second spec template for refactors (goal,
+            inventory, rules the code must satisfy, the guard that fails if violated). A word cap a hook
+            enforces. Specs are amended by appending a dated section, never by rewriting the body. The brief
+            carries the investigator's note and the brainstorm decisions verbatim so the writer reads code
+            only to confirm a name exists.
+          </p>
+        </div>
+
+        <h3>F to I, briefly</h3>
+
+        <ul>
+          <li><strong>Review budget</strong> (<a href="#reviews">section 6</a>): the mechanical rows into the script, the 1.0 rule, one whole-branch review.</li>
+          <li><strong>One pipeline for every size</strong> (<a href="#workflow">section 4</a>): the S/M/L tiers.</li>
+          <li><strong>Memory had become a ticket tracker.</strong> 33 of 77 files described a PR that was completed or abandoned; the index was at 19.6 KB of a 25 KB cap, past which new memories silently stop loading. The rule now: PR state is never stored, it is one tracker command away; memory keeps rulings, machine facts and diagnostic recipes.</li>
+          <li><strong>Hygiene.</strong> 46 registered worktrees, about 20 of them dead; 300 MB of ignored build copies; a permission for a build command that no longer existed; two agents told to use a Figma server they had no tools for. Thirty-nine worktrees removed, six unused global skills disabled, the rest a half-hour list.</li>
+        </ul>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Measure</th><th class="num">Before the audit</th><th class="num">After</th></tr></thead>
+            <tbody>
+              <tr><td>Words loaded every turn</td><td class="num">≈ 11,500</td><td class="num">≈ 2,950 (+ 945 path-scoped)</td></tr>
+              <tr><td>Rules file</td><td class="num">5,362 words, 79 dates</td><td class="num">2,170 words, ten rules, one branch table</td></tr>
+              <tr><td>Harness paths missing on <code>main</code></td><td class="num">17 of 91</td><td class="num">0, checked by a script</td></tr>
+              <tr><td>Document-writing roles</td><td class="num">top model, effort xhigh</td><td class="num">cheaper model; medium / high effort; caps enforced by hooks</td></tr>
+              <tr><td>Agents re-reading the rules file</td><td class="num">4</td><td class="num">0</td></tr>
+              <tr><td>Memory files</td><td class="num">77 (33 stale)</td><td class="num">34</td></tr>
+              <tr><td>Registered worktrees</td><td class="num">46</td><td class="num">7</td></tr>
+              <tr><td>Pipeline tiers</td><td class="num">1</td><td class="num">3</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ============================================================ -->
+      <section class="section" id="git">
+        <h2 class="section__title"><span class="num">09.</span> Keeping the harness out of git</h2>
+
+        <p>
+          The repository belongs to a team of eight, on a company tracker, and PRs carry product and
+          pipeline changes only. The first time a spec and a plan reached a pull request they had to be
+          rebased out, and the reviewers had rightly asked what they were. So the first ADR of the harness
+          is that the harness is untracked: the agents, skills, rules, hooks, tools, the local rules file,
+          the ADRs and every spec, plan and report. The mechanism is <code>.git/info/exclude</code>, the local
+          ignore file, never the tracked <code>.gitignore</code> a well-meaning agent would otherwise "fix".
+        </p>
+
+        <p>
+          Two files are tracked, because the team wrote them: a short persona and the architecture blueprint.
+          The docs-sync skill reports drift in those two instead of editing them; changing them is a team
+          decision and its own PR. Before every push, a diff of the range against the local-only paths must
+          print nothing, and since the audit that check is the git-guard hook, not a sentence.
+        </p>
+
+        <p>
+          The consequences are accepted and written down: no CI check guards the harness, so its
+          verification is local; a worktree session still loads the main checkout's harness; and the whole
+          thing is one <code>git add</code> away from being shared if the team ever wants it. Until then it
+          is one person's tooling and carries no team commitment.
+        </p>
+      </section>
+
+      <!-- ============================================================ -->
+      <section class="section" id="cost">
+        <h2 class="section__title"><span class="num">10.</span> What it cost, what it bought</h2>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Agent type</th><th class="num">Runs</th><th class="num">Tokens</th><th class="num">Avg / run</th></tr></thead>
+            <tbody>
+              <tr><td>implementer</td><td class="num">308</td><td class="num">48.5 M</td><td class="num">157k</td></tr>
+              <tr><td>planner</td><td class="num">45</td><td class="num">19.8 M</td><td class="num">439k</td></tr>
+              <tr><td>general-purpose (research, sweeps)</td><td class="num">86</td><td class="num">12.8 M</td><td class="num">149k</td></tr>
+              <tr><td>conventions reviewer</td><td class="num">124</td><td class="num">12.0 M</td><td class="num">97k</td></tr>
+              <tr><td>code reviewer</td><td class="num">125</td><td class="num">10.3 M</td><td class="num">83k</td></tr>
+              <tr><td>mechanical implementer</td><td class="num">87</td><td class="num">9.4 M</td><td class="num">108k</td></tr>
+              <tr><td>spec-writer</td><td class="num">19</td><td class="num">4.8 M</td><td class="num">253k</td></tr>
+              <tr><td>official code review</td><td class="num">19</td><td class="num">3.1 M</td><td class="num">162k</td></tr>
+              <tr><td>investigator</td><td class="num">12</td><td class="num">2.9 M</td><td class="num">241k</td></tr>
+              <tr><td>generic task reviewers</td><td class="num">23</td><td class="num">2.4 M</td><td class="num">105k</td></tr>
+              <tr><td>pr-creator</td><td class="num">13</td><td class="num">0.4 M</td><td class="num">33k</td></tr>
+              <tr><td><strong>Total, 28 run reports</strong></td><td class="num"><strong>858</strong></td><td class="num"><strong>≈ 125 M raw</strong></td><td class="num">246k – 19.2 M per branch</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p>
+          What that bought, in the same six weeks: the Nx migration (ten PRs, 42 libraries, feature work
+          never paused), a framework major upgrade with a UI-library swap across 41 libraries, the first
+          two waves of an RxJS-to-signals migration, and the foundation plus three component waves of a new
+          design-system kit, each with a spec, a plan, a report and a ledger. The alternative I compare
+          against is not "the same work by hand in six weeks". It is the two of those four that would have
+          happened at all.
+        </p>
+
+        <p>
+          The honest caveats: the dispatcher's context is uncounted; resumed agents overstate; and the
+          largest single cost, the 19.2-million-token component wave, is the run whose review stage the audit
+          later judged least worth its tokens.
+        </p>
+      </section>
+
+      <!-- ============================================================ -->
+      <section class="section" id="failures">
+        <h2 class="section__title"><span class="num">11.</span> Failure modes, recorded</h2>
+
+        <ul>
+          <li><strong>Confidently wrong reviewers.</strong> Two agreed on an injector-lifetime claim with no evidence; refuted by a throwaway test. Eight findings of one branch review refuted on inspection. A reviewer's finding is a claim.</li>
+          <li><strong>A planner with no edit tool</strong> rewrote the whole plan on every revision: two full writes, 303k tokens, on the first run. Fixed by giving it one, and later by caps.</li>
+          <li><strong>Output nobody asked for.</strong> 104 pre-existing type errors printed per run, read in full by every agent, until the baseline. Plans that were 99 % prose. A 16,800-word spec.</li>
+          <li><strong>Blocked on the environment.</strong> A branch whose <code>node_modules</code> belonged to another branch's framework version: every first verification failed until the dispatcher ran a clean install. "Blocked (environment)" is now a report state.</li>
+          <li><strong>Stale caches that look green.</strong> A lint cache replaying a stale pass; the Nx daemon dropping a renamed library from a run. The verification script disables the daemon.</li>
+          <li><strong>Refusals, some right.</strong> A subagent's own harness refused to edit the lint config as a "CI bypass"; the rule became that only the main session edits it. The pr-creator refused a vague "go on". The platform's permission classifier refused a subagent's file deletion during the memory prune, and the deletion was handed to the human as one command. Each of those is the system working.</li>
+          <li><strong>History surgery in a shared tree.</strong> One implementer rewrote history with low-level git commands to tidy a commit. The ruling: no implementer touches refs beyond a pathspec commit, ever; two untidy commits stay untidy because the repo squash-merges.</li>
+          <li><strong>The dispatcher's own hands.</strong> A string replacement with an unescaped <code>$`</code> corrupted an ADR's addendum, caught by a review. The dispatcher is not exempt from the gates.</li>
+          <li><strong>Context exhaustion</strong>, twice: once into a handover document, once into the 80 % rule. A weekly budget on the top model ran out mid-run and forced a model switch; the ledger row says so.</li>
+          <li><strong>Ledger holes.</strong> An accidental interrupt and an API outage lost rows; resumed agents double-count. The totals are honest about being raw.</li>
+        </ul>
+      </section>
+
+      <!-- ============================================================ -->
+      <section class="section" id="principles">
+        <h2 class="section__title"><span class="num">12.</span> Principles, and what is next</h2>
+
+        <ul>
+          <li><strong>One home per rule.</strong> A fact lives in one file; everything else points at it. The audit is what happens when you do not.</li>
+          <li><strong>Hooks over prose.</strong> If a rule can be a script, it is a script. "A deterministic guard for the two git rules prose used to carry."</li>
+          <li><strong>A structural rule names the guard that fails when it is broken</strong>, or says plainly that none exists.</li>
+          <li><strong>Lint is parity, not zero.</strong> A touched file comes back no worse. A ratchet only moves one way.</li>
+          <li><strong>Skills for knowledge, MCP for connectivity.</strong> And every MCP server read-only unless the write path is already a deliberate, human-gated command.</li>
+          <li><strong>Model and effort per role, in frontmatter, nowhere else.</strong> The transcription job does not get the reasoning budget.</li>
+          <li><strong>Rulings carry a price.</strong> "Cost if wrong" next to every decision makes reversing it a sentence instead of an argument.</li>
+          <li><strong>Measure the reviewers.</strong> Findings that changed code, per 100k tokens, per agent type. Then act on it sooner than five weeks.</li>
+          <li><strong>The human verifies; the agent never opens the PR first.</strong></li>
+          <li><strong>No AI attribution in commits or PR bodies.</strong> The work is the team's; the tooling is a detail of how it was done.</li>
+        </ul>
+
+        <p>Next, in the order I would do them:</p>
+
+        <ul>
+          <li>The Nx plugin's census commands fully replacing the last hand-written layout tables.</li>
+          <li>A Playwright CLI click-through subagent as a pre-check before the human one, on the one app that has no login wall.</li>
+          <li>Evals: a scorer over the run reports so a change to a prompt or a tier can be judged by findings per 100k and tokens per merged task, not by feel.</li>
+          <li>Memory kept under the cap by a hook, not by an audit.</li>
+          <li>Sharing the harness with the team, which is one <code>git add</code> and a conversation.</li>
+        </ul>
+
+        <p>
+          The model is the easy part. The harness is the part you keep.
+        </p>
+      </section>
+    </main>
+
+    <footer class="footer" id="contact">
+      <h2 class="footer__title">Building a harness of your own?</h2>
+      <p class="footer__sub">
+        I design AI-engineering workflows for production front-end teams: rules, roles, gates, ledgers, and
+        the audit that keeps them honest.
+      </p>
+      <a class="btn btn--primary" href="mailto:andriisiuta@gmail.com">andriisiuta@gmail.com</a>
+      <a class="btn btn--ghost" href="/articles/nx-migration/">Read the Nx migration</a>
+      <p class="footer__note mono">© 2026 Andrii Siuta · written with the run reports open · deployed on GitHub Pages</p>
+    </footer>
+  </div>
+</body>
+</html>
