@@ -1,0 +1,886 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Porting a React design system to Angular — Andrii Siuta</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="How a company design system that shipped React only became a native Angular UI kit: three layers of plain CSS tokens, attribute-selector components, Signal Forms, CDK overlays, a preview app instead of Storybook, axe and keyboard tests on every page, parallel AI agents, and the day Figma disagreed.">
+  <meta property="og:title" content="Porting a React design system to Angular: 69 components in two days">
+  <meta property="og:description" content="Plain CSS tokens, Signal Forms, CDK overlays, a preview app for designers, accessibility as tests, parallel AI agents in worktrees, and a Figma correction encoded as one override file.">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://andriisiuta.github.io/articles/react-to-angular-ui-kit/">
+  <meta property="article:published_time" content="2026-10-04">
+  <meta property="article:author" content="Andrii Siuta">
+  <link rel="canonical" href="https://andriisiuta.github.io/articles/react-to-angular-ui-kit/">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚡</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #06060f;
+      --bg-card: #0d0d1c;
+      --bg-card-hover: #12122a;
+      --border: #1e1e3a;
+      --text: #d6d6e7;
+      --text-dim: #8a8aa3;
+      --heading: #f4f4fb;
+      --pink: #ff3e7f;
+      --violet: #a855f7;
+      --red: #f0060b;
+      --green: #3ddc97;
+      --gradient: linear-gradient(90deg, #f0060b 0%, #cc26d5 55%, #7702ff 100%);
+      --gradient-soft: linear-gradient(90deg, #ff3e7f 0%, #a855f7 100%);
+      --font-body: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+      --font-head: 'Space Grotesk', var(--font-body);
+      --font-mono: 'JetBrains Mono', ui-monospace, 'Fira Code', monospace;
+      color-scheme: dark;
+    }
+
+    * { box-sizing: border-box; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      margin: 0;
+      background:
+        radial-gradient(ellipse 60% 40% at 70% -10%, rgba(119, 2, 255, 0.14), transparent),
+        radial-gradient(ellipse 50% 35% at 20% 10%, rgba(255, 62, 127, 0.1), transparent),
+        var(--bg);
+      color: var(--text);
+      font-family: var(--font-body);
+      font-size: 16px;
+      line-height: 1.65;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    ::selection { background: rgba(255, 62, 127, 0.35); color: #fff; }
+
+    .mono { font-family: var(--font-mono); }
+    .accent { color: var(--pink); }
+
+    a { color: var(--pink); text-decoration: none; }
+    a:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+    .nav {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px max(16px, calc(50vw - 506px));
+      backdrop-filter: blur(12px);
+      background: rgba(6, 6, 15, 0.7);
+      border-bottom: 1px solid rgba(30, 30, 58, 0.6);
+    }
+
+    .nav__brand { font-family: var(--font-head); font-weight: 700; font-size: 1.4rem; color: var(--heading); }
+    .nav__brand:hover { text-decoration: none; }
+    .nav__links { display: flex; gap: 22px; }
+    .nav__links a { color: var(--text-dim); font-size: 0.9rem; transition: color 0.2s; }
+    .nav__links a:hover { color: var(--pink); text-decoration: none; }
+
+    .wrap { max-width: 1060px; margin: 0 auto; padding: 0 16px; }
+    .article { max-width: 760px; margin: 0 auto; }
+
+    .hero { position: relative; padding: 80px 0 40px; }
+    .hero__glow { position: absolute; border-radius: 50%; filter: blur(90px); pointer-events: none; }
+    .hero__glow--pink { width: 380px; height: 380px; top: -60px; right: -80px; background: rgba(255, 62, 127, 0.16); }
+    .hero__glow--violet { width: 300px; height: 300px; bottom: -40px; left: -100px; background: rgba(119, 2, 255, 0.16); }
+    .hero__eyebrow { color: var(--pink); font-size: 0.95rem; margin: 0 0 14px; }
+    .cursor { animation: blink 1.1s step-end infinite; }
+    @keyframes blink { 50% { opacity: 0; } }
+
+    .hero__title {
+      font-family: var(--font-head);
+      font-size: clamp(2rem, 5.2vw, 3.4rem);
+      font-weight: 700;
+      line-height: 1.08;
+      margin: 0 0 20px;
+      background: var(--gradient);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      filter: drop-shadow(0 0 24px rgba(204, 38, 213, 0.25));
+    }
+
+    .hero__dek { color: var(--text-dim); font-size: 1.12rem; line-height: 1.6; margin: 0 0 26px; max-width: 700px; }
+    .hero__meta { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; color: var(--text-dim); font-size: 0.85rem; }
+
+    .chip {
+      font-family: var(--font-mono);
+      font-size: 0.74rem;
+      color: var(--text);
+      background: rgba(168, 85, 247, 0.1);
+      border: 1px solid rgba(168, 85, 247, 0.3);
+      border-radius: 999px;
+      padding: 3px 11px;
+    }
+
+    .metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin: 30px 0 10px; }
+
+    .metric {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 18px 14px;
+      text-align: center;
+      transition: border-color 0.25s, transform 0.25s;
+    }
+
+    .metric:hover { border-color: rgba(255, 62, 127, 0.5); transform: translateY(-3px); }
+
+    .metric__value {
+      display: block;
+      font-family: var(--font-head);
+      font-size: 1.55rem;
+      font-weight: 700;
+      line-height: 1.15;
+      letter-spacing: -0.01em;
+      background: var(--gradient-soft);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      white-space: nowrap;
+    }
+
+    .metric__label { display: block; color: var(--text-dim); font-size: 0.8rem; margin-top: 6px; }
+
+    .toc { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 20px 24px; margin: 36px 0 10px; }
+    .toc__title { font-family: var(--font-mono); font-size: 0.78rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.08em; margin: 0 0 12px; }
+    .toc ol { margin: 0; padding: 0; list-style: none; columns: 2; column-gap: 28px; }
+    .toc li { margin: 0 0 7px; break-inside: avoid; font-size: 0.93rem; }
+    .toc li a { color: var(--text); }
+    .toc li a:hover { color: var(--pink); text-decoration: none; }
+    .toc .n { font-family: var(--font-mono); color: var(--pink); font-size: 0.8rem; margin-right: 8px; }
+
+    .section { padding: 54px 0 4px; }
+
+    .section__title {
+      font-family: var(--font-head);
+      font-size: 1.65rem;
+      color: var(--heading);
+      margin: 0 0 24px;
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+      line-height: 1.25;
+    }
+
+    .section__title::after { content: ''; flex: 1; height: 1px; min-width: 24px; background: linear-gradient(90deg, var(--border), transparent); }
+    .section__title .num { font-family: var(--font-mono); color: var(--pink); font-size: 1rem; flex-shrink: 0; }
+
+    h3 { font-family: var(--font-head); color: var(--heading); font-size: 1.15rem; margin: 34px 0 12px; }
+
+    p { margin: 0 0 16px; }
+    .article ul, .article ol { margin: 0 0 18px; padding-left: 22px; }
+    .article li { margin-bottom: 7px; }
+    .article li::marker { color: var(--pink); }
+    strong { color: var(--heading); font-weight: 600; }
+
+    code {
+      font-family: var(--font-mono);
+      font-size: 0.86em;
+      background: rgba(168, 85, 247, 0.1);
+      border: 1px solid rgba(168, 85, 247, 0.22);
+      border-radius: 5px;
+      padding: 1px 6px;
+      color: var(--text);
+      word-break: break-word;
+    }
+
+    pre {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 18px 20px;
+      margin: 0 0 20px;
+      overflow-x: auto;
+      font-size: 0.82rem;
+      line-height: 1.6;
+    }
+
+    pre code { background: none; border: 0; padding: 0; font-size: inherit; color: var(--text); word-break: normal; }
+
+    .pre__label { display: block; font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-dim); margin: 0 0 10px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+
+    .c { color: var(--text-dim); }
+    .s { color: var(--pink); }
+    .k { color: var(--violet); }
+
+    .pull {
+      margin: 28px 0;
+      padding: 6px 0 6px 22px;
+      border-left: 3px solid transparent;
+      border-image: var(--gradient-soft) 1;
+      font-family: var(--font-head);
+      font-size: 1.2rem;
+      line-height: 1.45;
+      color: var(--heading);
+    }
+
+    .pull p { margin: 0; }
+
+    .note { border: 1px solid var(--border); border-left: 3px solid var(--violet); border-radius: 10px; padding: 14px 18px; background: var(--bg-card); margin: 0 0 20px; font-size: 0.95rem; }
+    .note p:last-child { margin: 0; }
+    .note__tag { display: inline-block; font-family: var(--font-mono); font-size: 0.72rem; color: var(--violet); border: 1px solid rgba(168, 85, 247, 0.5); border-radius: 999px; padding: 2px 9px; margin-bottom: 8px; }
+    .note--pink { border-left-color: var(--pink); }
+    .note--pink .note__tag { color: var(--pink); border-color: rgba(255, 62, 127, 0.5); }
+    .note--green { border-left-color: var(--green); }
+    .note--green .note__tag { color: var(--green); border-color: rgba(61, 220, 151, 0.5); }
+
+    .table-wrap { overflow-x: auto; margin: 0 0 22px; border: 1px solid var(--border); border-radius: 12px; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.9rem; min-width: 480px; }
+    th, td { padding: 10px 14px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--border); }
+    th { font-family: var(--font-mono); font-weight: 600; font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-dim); background: var(--bg-card); }
+    tr:last-child td { border-bottom: 0; }
+    tbody tr:hover td { background: rgba(168, 85, 247, 0.05); }
+    td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    td:first-child code { white-space: nowrap; }
+
+    figure { margin: 26px 0 24px; }
+    figure svg { display: block; width: 100%; max-width: 100%; height: auto; }
+    figure svg text { font-family: var(--font-mono); }
+    figcaption { color: var(--text-dim); font-size: 0.86rem; margin-top: 12px; line-height: 1.5; }
+
+    .footer { text-align: center; padding: 80px 0 50px; }
+    .footer__title { font-family: var(--font-head); font-size: clamp(1.4rem, 4vw, 2rem); color: var(--heading); margin: 0 0 12px; }
+    .footer__sub { color: var(--text-dim); max-width: 520px; margin: 0 auto 26px; }
+
+    .btn { display: inline-block; padding: 12px 26px; border-radius: 8px; font-weight: 600; font-size: 0.95rem; transition: transform 0.2s, box-shadow 0.2s; }
+    .btn:hover { text-decoration: none; transform: translateY(-2px); }
+    .btn--primary { background: var(--gradient-soft); color: #fff; box-shadow: 0 0 24px rgba(255, 62, 127, 0.35); }
+    .btn--primary:hover { box-shadow: 0 0 36px rgba(168, 85, 247, 0.5); }
+    .btn--ghost { border: 1px solid var(--border); color: var(--text); margin-left: 10px; }
+    .btn--ghost:hover { border-color: var(--pink); color: var(--pink); }
+    .footer__note { margin-top: 40px; color: var(--text-dim); font-size: 0.75rem; opacity: 0.7; }
+
+    @media (max-width: 640px) {
+      .hero { padding-top: 56px; }
+      .nav__links { gap: 14px; }
+      .nav__links a { font-size: 0.8rem; }
+      .metrics { grid-template-columns: repeat(2, 1fr); }
+      .metric__value { font-size: 1.3rem; }
+      .toc ol { columns: 1; }
+      figure { overflow-x: auto; }
+      figure svg { min-width: 640px; }
+      .pull { font-size: 1.05rem; }
+      .btn--ghost { margin-left: 0; margin-top: 10px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      .cursor { animation: none; }
+      .metric, .btn { transition: none; }
+    }
+  </style>
+</head>
+<body>
+  <nav class="nav">
+    <a class="nav__brand" href="/">AS<span class="accent">.</span></a>
+    <div class="nav__links">
+      <a href="/">CV</a>
+      <a href="/articles/">Writing</a>
+      <a href="https://github.com/AndriiSiuta" target="_blank" rel="noopener">GitHub</a>
+      <a href="https://www.linkedin.com/in/andrii-siuta/" target="_blank" rel="noopener">LinkedIn</a>
+    </div>
+  </nav>
+
+  <div class="wrap">
+    <header class="hero">
+      <div class="hero__glow hero__glow--pink"></div>
+      <div class="hero__glow hero__glow--violet"></div>
+      <p class="hero__eyebrow mono">$ cat articles/react-to-angular-ui-kit.md<span class="cursor">▊</span></p>
+      <h1 class="hero__title">Porting a React design system to Angular: 69 components in two days</h1>
+      <p class="hero__dek">
+        The company design system shipped a React library, a Figma file and a documentation site. Our
+        product is Angular. So we rewrote the kit natively: plain CSS tokens, attribute-selector components,
+        Signal Forms, CDK overlays, a preview app instead of Storybook, and an accessibility and performance
+        suite on every page. 381 commits, four waves, mostly done by parallel AI agents. Then the designer
+        opened Figma next to it, and we learned which of our rules had been wrong.
+      </p>
+      <div class="hero__meta">
+        <span>Andrii Siuta</span>
+        <span>·</span>
+        <span>October 2026</span>
+        <span>·</span>
+        <span>~25 min read</span>
+        <span class="chip">Angular 22</span>
+        <span class="chip">Signal Forms</span>
+        <span class="chip">CSS custom properties</span>
+        <span class="chip">CDK</span>
+        <span class="chip">Playwright + axe</span>
+      </div>
+
+      <div class="metrics" aria-label="Key numbers">
+        <div class="metric"><span class="metric__value">69</span><span class="metric__label">components ported, waves 0 – 3</span></div>
+        <div class="metric"><span class="metric__value">484</span><span class="metric__label">icons generated, tree-shakable</span></div>
+        <div class="metric"><span class="metric__value">0 Sass</span><span class="metric__label">6,205 lines of plain CSS</span></div>
+        <div class="metric"><span class="metric__value">4,284</span><span class="metric__label">unit tests · 949 e2e pages</span></div>
+        <div class="metric"><span class="metric__value">381</span><span class="metric__label">commits in 32 hours</span></div>
+        <div class="metric"><span class="metric__value">≈ 0.7 M</span><span class="metric__label">agent tokens per component</span></div>
+      </div>
+    </header>
+
+    <main class="article">
+      <nav class="toc" aria-label="Contents">
+        <p class="toc__title">Contents</p>
+        <ol>
+          <li><span class="n">01</span><a href="#start">The starting point</a></li>
+          <li><span class="n">02</span><a href="#why">Why a native port</a></li>
+          <li><span class="n">03</span><a href="#tokens">Theming: three layers of plain CSS</a></li>
+          <li><span class="n">04</span><a href="#shape">What a component looks like</a></li>
+          <li><span class="n">05</span><a href="#forms">Signal Forms, not ControlValueAccessor</a></li>
+          <li><span class="n">06</span><a href="#overlays">Overlays without the body container</a></li>
+          <li><span class="n">07</span><a href="#a11y">Accessibility as a test, not a review</a></li>
+          <li><span class="n">08</span><a href="#preview">A preview app instead of Storybook</a></li>
+          <li><span class="n">09</span><a href="#agents">How the agents did most of the work</a></li>
+          <li><span class="n">10</span><a href="#figma">The day Figma disagreed</a></li>
+          <li><span class="n">11</span><a href="#numbers">Numbers, and what is open</a></li>
+          <li><span class="n">12</span><a href="#again">If we did it again</a></li>
+        </ol>
+      </nav>
+
+      <!-- ============================================================ -->
+      <section class="section" id="start">
+        <h2 class="section__title"><span class="num">01.</span> The starting point</h2>
+
+        <p>
+          The design system is mature: a documentation site of about a hundred pages, a Figma library with
+          foundations, components, widgets and templates, and an Apache-licensed React component library
+          with 85 component folders, built on MUI, Emotion and a handful of React-only helpers. Its next
+          major version dropped the theme we use. There is no Angular package and no Web Components build.
+        </p>
+
+        <p>
+          Our product is a large Angular application. Before this work it rendered Angular Material
+          components, a PrimeNG-based table library, Bootstrap buttons and about 1,600 hard-coded hex values
+          in component styles, with no dark mode. Every screen looked a little like the design system and
+          none of them looked exactly like it.
+        </p>
+
+        <p>
+          The scope we agreed: port the React library's v6 line, pinned to one commit, into a new Angular
+          library inside our Nx workspace. Charts, the code editor, experimental components and the patterns
+          the design system itself marks "not available in code" are out. That is 85 upstream folders,
+          planned as seven waves, of which four are done.
+        </p>
+      </section>
+
+      <!-- ============================================================ -->
+      <section class="section" id="why">
+        <h2 class="section__title"><span class="num">02.</span> Why a native port</h2>
+
+        <p>Three shortcuts were on the table, and each had a disqualifying cost.</p>
+
+        <ul>
+          <li><strong>Wrap the React components.</strong> Two frameworks in one bundle, two change-detection models, and every form control a bridge. Storybook would have been the natural catalogue, and Storybook itself depends on React.</li>
+          <li><strong>Theme an existing Angular library to look like the design system.</strong> The PrimeNG family's token engine injects styles at runtime: a CSP nonce, kilobytes of JavaScript, a regenerated <code>&lt;style&gt;</code> element per component type on every theme change.</li>
+          <li><strong>Copy the React kit's styling literally.</strong> It mixed four mechanisms at once: generated CSS variables, Emotion classes in the theme object, per-component variables with no shared prefix, and <code>light-dark()</code> in one theme's overrides, plus a parallel MUI theme for breakpoints.</li>
+        </ul>
+
+        <p>
+          So we rewrote it, importing only Angular and the CDK. Before a line was written, four read-only
+          research passes studied how others solved the same problems, and the result was a table of what
+          to take and what to leave:
+        </p>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>From</th><th>Take</th><th>Leave</th></tr></thead>
+            <tbody>
+              <tr><td>Angular Material (M3)</td><td>component tokens unset by default, with a system fallback in static CSS</td><td>its colour roles; we keep the design system's names</td></tr>
+              <tr><td>PrimeNG / its fork</td><td>the per-instance override idea; a typed token map</td><td>the runtime engine and style injection</td></tr>
+              <tr><td>Taiga UI</td><td>forceable state selectors; options through DI that merge with the parent; attribute selectors on native elements; text as signals; URL-synced controls; an axe pass on every page</td><td>global unencapsulated styles, LESS mixins as public API, their docs addon as a dependency</td></tr>
+              <tr><td>The React kit</td><td>token names, the theme selectors, helper semantics, the behaviour and API of every component</td><td>about 140 compatibility colours, JavaScript branches on the theme name, the <code>classes</code> prop</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ============================================================ -->
+      <section class="section" id="tokens">
+        <h2 class="section__title"><span class="num">03.</span> Theming: three layers of plain CSS</h2>
+
+        <ol>
+          <li><strong>System tokens</strong> carry the design system's names (<code>--ds-colors-primary</code>, <code>--ds-space-sm</code>), generated into one CSS file under a theme selector, with a dark block that holds only the values that differ.</li>
+          <li><strong>Component tokens</strong> (<code>--kit-button-height</code>, <code>--kit-tag-color</code>) are never set by the kit. Each is read once with a system fallback, so a value set on any ancestor, or on the host, always wins.</li>
+          <li><strong>Defaults through DI.</strong> Every input defaults from an options token; a provider merges a partial over the parent injector's value, so a container can re-default its children.</li>
+        </ol>
+
+<pre><span class="pre__label">the shape of a component stylesheet</span><code>:host {
+  <span class="c">/* private switch, set by data-size / data-variant */</span>
+  --_height: var(--kit-button-height, 32px);
+  --_bg: var(--kit-button-bg, var(--ds-colors-primary));
+
+  height: var(--_height);
+  background: var(--_bg);
+  transition: background calc(150ms * var(--ds-motion-scale)) ease;
+}
+
+:host([data-size='lg']) { --_height: var(--kit-button-height, 48px); }
+
+<span class="c">/* every state rule exists twice: the real one, and a forced one for the preview */</span>
+:host(:hover:not([data-state])), :host([data-state='hover']) {
+  --_bg: var(--kit-button-bg-hover, color-mix(in srgb, var(--ds-colors-primary) 88%, black));
+}</code></pre>
+
+        <p>
+          Overrides go cheapest first: a system token on a subtree, a component token on a subtree or a host,
+          a typed <code>[kitTokens]</code> input, a provided options value. A brand theme is one more token
+          block; a one-off override is one CSS variable. Dark mode follows <code>prefers-color-scheme</code>
+          until the app pins it, and a directive re-themes a subtree.
+        </p>
+
+        <h3>Plain CSS, by ruling</h3>
+
+        <div class="note note--pink">
+          <span class="note__tag">challenge</span>
+          <p>
+            The foundation spec emitted the tokens as Sass partials with mixins, because that is what the
+            rest of the application used. Halfway through the foundation wave I stopped it: mixins hide
+            what a component actually sets, and custom properties already do everything the mixins did.
+          </p>
+        </div>
+
+        <div class="note note--green">
+          <span class="note__tag">how we solved it</span>
+          <p>
+            A twelve-commit conversion: one generated <code>tokens.css</code>, the composite font mixins
+            dropped in favour of individual properties, and a guard that fails on any <code>.scss</code>,
+            <code>.sass</code> or <code>.less</code> file, or any <code>@use</code>, <code>@mixin</code> or
+            <code>@include</code>, in the kit or its preview app. A consuming app lists two stylesheets and
+            needs no preprocessor.
+          </p>
+        </div>
+
+        <h3>Generated, never hand-edited</h3>
+
+        <p>
+          A Node script reads the upstream theme function out of the packed npm tarball, unpacked outside
+          the workspace so no React dependency is added, classifies every key with a checked-in groups file,
+          and writes the CSS and a typed TypeScript map. An unknown upstream key stops the generator, so a
+          version bump cannot add or drop a token silently. Output is deterministic and Prettier-stable.
+          Upstream's 323 variables became 181 on first emit: the compatibility colours and the deprecated
+          groups did not survive. The kit added four tokens of its own: a focus-ring colour, width and
+          offset, and a motion scale that becomes 0 under <code>prefers-reduced-motion</code>.
+        </p>
+
+        <p>
+          Icons follow the same rule. A second generator turns 484 upstream SVGs into one tree-shakable
+          module of typed constants. Up to four fills become colour slots, slot 0 is
+          <code>currentColor</code>, circles become arc paths, and there is no <code>innerHTML</code> and no
+          sprite. An icon is a bare <code>1em</code> glyph; with a label it is <code>role="img"</code>,
+          without one it is hidden from assistive technology.
+        </p>
+      </section>
+
+      <!-- ============================================================ -->
+      <section class="section" id="shape">
+        <h2 class="section__title"><span class="num">04.</span> What a component looks like</h2>
+
+        <p>
+          A native control is an attribute-selector component on the native element, so links stay links
+          and buttons keep their form semantics. A container is an element. Behaviour alone is a directive.
+        </p>
+
+<pre><span class="pre__label">the shape, placeholder names</span><code><span class="k">@Component</span>({
+  selector: <span class="s">'button[kitButton], a[kitButton]'</span>,
+  hostDirectives: [KitButtonHost],
+  templateUrl: <span class="s">'./button.component.html'</span>,
+  styleUrl: <span class="s">'./button.component.css'</span>,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+})
+<span class="k">export class</span> KitButtonComponent {}
+
+<span class="k">@Directive</span>({
+  host: {
+    <span class="s">'[attr.data-variant]'</span>: <span class="s">'variant()'</span>,
+    <span class="s">'[attr.data-size]'</span>: <span class="s">'size()'</span>,
+    <span class="s">'[attr.aria-disabled]'</span>: <span class="s">'disabled() || null'</span>,
+  },
+})
+<span class="k">export class</span> KitButtonHost {
+  <span class="k">private readonly</span> options = inject(KIT_BUTTON_OPTIONS);
+  <span class="k">readonly</span> variant = input(<span class="k">this</span>.options.variant);
+  <span class="k">readonly</span> size = input(<span class="k">this</span>.options.size);
+  <span class="k">readonly</span> disabled = input(<span class="k">false</span>);
+}</code></pre>
+
+        <p>Every component folder has the same eight files, and the preview app mirrors it:</p>
+
+        <ul>
+          <li><strong>Kit:</strong> the component's TS, HTML, CSS and spec; a model file for its types; an options file (defaults and English labels, overridable per injector); a tokens file mapping every key to its variable, fallback and kind.</li>
+          <li><strong>Preview:</strong> a page, a controls file (typed per input, with its own spec), an accessibility file, and a stress page that renders the component 500 times.</li>
+          <li><strong>E2E:</strong> one keyboard script per component.</li>
+        </ul>
+
+        <p>
+          Labels are English defaults in the options, never translation keys. The kit has no dependency on
+          a translation library; an app that translates provides its labels once per injector. Nothing in the
+          kit is <code>providedIn: 'root'</code>; the one service it has is listed in the kit's providers.
+          Two boundary rows in the lint config keep it honest: the kit's scope may import only itself, and
+          its UI libraries may import only Angular and RxJS. Material, PrimeNG, the translation library, the
+          state library and Bootstrap are banned by name.
+        </p>
+      </section>
+
+      <!-- ============================================================ -->
+      <section class="section" id="forms">
+        <h2 class="section__title"><span class="num">05.</span> Signal Forms, not ControlValueAccessor</h2>
+
+        <p>
+          Angular 22's Signal Forms let a custom control implement <code>FormValueControl&lt;T&gt;</code> (a
+          <code>value</code> model) or <code>FormCheckboxControl</code> (a <code>checked</code> model). The
+          <code>[formField]</code> directive binds every other state it finds: disabled, read-only, required,
+          invalid, touched, errors. We ruled out <code>ControlValueAccessor</code> entirely, and the guard has
+          a row that fails on <code>NG_VALUE_ACCESSOR</code> anywhere in the kit. A screen still on Reactive
+          Forms reaches a kit control through the Signal Forms compatibility layer.
+        </p>
+
+        <div class="note note--pink">
+          <span class="note__tag">challenge</span>
+          <p>
+            The open question going into the checkbox pilot: how does <code>[formField]</code> treat an
+            attribute-selector component on a native <code>input</code> that also declares
+            <code>checked = model()</code>? As the native element, or as the custom control?
+          </p>
+        </div>
+
+        <div class="note note--green">
+          <span class="note__tag">how we solved it</span>
+          <p>
+            The pilot answered it: as a custom control, so the component owns the DOM sync. That set the rule
+            for the form-controls wave, "the composite is the control": the text-input component, not the
+            inner native input, carries <code>[formField]</code>. A radio inside a form field throws, so the
+            group is what binds. Eighteen classes implement the contract today. One limit is written down:
+            a <code>model()</code> cannot learn about a reset to the same value.
+          </p>
+        </div>
+      </section>
+
+      <!-- ============================================================ -->
+      <section class="section" id="overlays">
+        <h2 class="section__title"><span class="num">06.</span> Overlays without the body container</h2>
+
+        <div class="note note--pink">
+          <span class="note__tag">challenge</span>
+          <p>
+            The CDK's menu trigger and dialog render into a body-level overlay container. Our theme is a
+            subtree selector, so anything rendered outside the subtree loses its tokens: a dark-mode page
+            opens a light-mode menu.
+          </p>
+        </div>
+
+        <div class="note note--green">
+          <span class="note__tag">how we solved it</span>
+          <p>
+            Every overlay is kit-owned and rendered in place on the CDK's inline popover support. Modals
+            are a native <code>&lt;dialog&gt;</code> opened with <code>showModal()</code>, which gives the top
+            layer, the backdrop, focus containment and Escape for free. A projected option cannot carry the
+            CDK's listbox option directive, because DI follows the declaration tree rather than the
+            projection, so the kit has its own listbox on <code>FocusKeyManager</code>. That leaves two listbox
+            implementations side by side, which is written down as debt.
+          </p>
+        </div>
+      </section>
+
+      <!-- ============================================================ -->
+      <section class="section" id="a11y">
+        <h2 class="section__title"><span class="num">07.</span> Accessibility as a test, not a review</h2>
+
+        <ul>
+          <li><strong>axe on every page and every tab, in light and dark</strong>, in a Playwright suite: 949 pages at the last gate.</li>
+          <li><strong>One keyboard script per component</strong>, following the WAI-ARIA Authoring Practices pattern named in the component's brief: 70 files, 467 tests.</li>
+          <li><strong>A focus ring that reaches 3:1 on every surface</strong> it can sit on. Upstream hard-coded a ring that measured 2.35:1; the kit's ring is a token, and the guard computes the ratio against every background, compositing translucent and mixed colours itself.</li>
+          <li><strong>A <code>forced-colors</code> block</strong> wherever state is carried by background alone, 24-pixel minimum targets, and every transition multiplied by the motion-scale token.</li>
+          <li><strong>Performance in the same suite.</strong> 43 stress pages render 500 instances each. The DOM-node count per instance is exact, and timing fails above <code>max(1.5 × baseline, baseline + 10 ms)</code>. The plain 1.5× bar was inside scheduling noise for sub-15 ms medians.</li>
+        </ul>
+
+        <div class="note note--pink">
+          <span class="note__tag">challenge</span>
+          <p>
+            Some of the design system's own colour pairs fail WCAG AA. "Port the design faithfully" and
+            "zero axe violations" cannot both hold, and changing a brand colour is not the kit's call.
+          </p>
+        </div>
+
+        <div class="note note--green">
+          <span class="note__tag">how we solved it</span>
+          <p>
+            Colours ship as designed. Every failing pair is recorded, with its measured ratio, in a
+            shrink-only exceptions list for the design-system team; axe and the guard treat a listed pair as
+            known and any other failure as a bug. The list grew from 16 exceptions over 25 pairs in the first
+            wave to 59 over 125 today, and every entry is a conversation the design team can have with data.
+            The only colour the kit fixes on its own is the focus ring.
+          </p>
+        </div>
+
+        <p>
+          One contrast claim was withdrawn: axe reported 4.26:1 for a set of category colours, and it was a
+          reading taken in the middle of a 0.3-second background transition. The tests now wait for
+          transitions to end.
+        </p>
+      </section>
+
+      <!-- ============================================================ -->
+      <section class="section" id="preview">
+        <h2 class="section__title"><span class="num">08.</span> A preview app instead of Storybook</h2>
+
+        <p>
+          The catalogue is a zoneless Angular app in the same workspace. I described it as an interactive
+          Figma: the foundations (colours, icons, radii, spacing, typography), one page per component and one
+          stress page per heavy component, with a searchable, resizable sidebar.
+        </p>
+
+        <ul>
+          <li><strong>Four tabs per page:</strong> Playground, Tokens (every component token with its resolved value), Accessibility, and Code (the template for the current control values).</li>
+          <li><strong>A forced-state switch</strong> (hover, active, focus-visible, disabled, invalid) written as <code>data-state</code>, which is why every state rule exists in two forms. A designer can look at the hover state without holding a mouse still.</li>
+          <li><strong>Every control is a URL parameter.</strong> Controls are typed per input, a few names are reserved and a page that uses one fails, and an empty text parameter means the empty string while an absent one means the default. A link to a specific variant in a specific state in dark mode is a URL.</li>
+          <li><strong>The colour-mode switch sits in a sticky header</strong>, because comparing a component in light and dark is the most frequent thing anyone does in it.</li>
+        </ul>
+
+        <p>
+          A second spec, written after I looked at the first version, asks for more for designers: an
+          examples gallery, grouped controls with human labels, a Design tab with anatomy, pixel sizes,
+          tokens resolved in both modes and the Figma link, and a canvas with surface, viewport, zoom and RTL
+          as URL parameters. It has been deferred twice behind component waves. It is the right next thing,
+          because of what happened in <a href="#figma">section 10</a>.
+        </p>
+      </section>
+
+      <!-- ============================================================ -->
+      <section class="section" id="agents">
+        <h2 class="section__title"><span class="num">09.</span> How the agents did most of the work</h2>
+
+        <p>
+          The port ran on the same harness as the <a href="/articles/nx-migration/">Nx migration</a>
+          (described in <a href="/articles/ai-harness/">its own article</a>): a spec per wave, a plan per
+          batch, implementer agents with a verification command, reviewers, and a run report with a token
+          ledger. What was specific to the kit:
+        </p>
+
+        <h3>A brief per component</h3>
+
+        <p>Each implementer received one component and a contract block, written by a planner agent:</p>
+
+        <ul>
+          <li>the upstream source paths, the component's entry in the theme file, and the Figma node id;</li>
+          <li>the selector, inputs, outputs, slots, host attributes and English labels;</li>
+          <li>styles in pixels, component tokens with their fallbacks;</li>
+          <li>roles and accessible names, the WAI-ARIA pattern, the keyboard table;</li>
+          <li>the preview controls, the stress case with its expected DOM nodes per instance, the contrast pairs to add;</li>
+          <li>"deviations to list", and which guards would fail if the contract were violated.</li>
+        </ul>
+
+        <p>
+          Then seven steps: read, write the kit files, write the spec, write the preview page, write the
+          keyboard script, run the checks, commit. A value the planner had written from memory of the React
+          library, rather than read, was flagged "check it at the click-through".
+        </p>
+
+        <h3>From a shared tree to a worktree each</h3>
+
+        <div class="note note--pink">
+          <span class="note__tag">challenge</span>
+          <p>
+            Components are independent, so I asked for more agents in parallel. In the display-and-layout
+            wave up to nine implementers worked in one shared checkout, and the shared build was red most of
+            the time: one agent's half-written component broke every other agent's verification.
+          </p>
+        </div>
+
+        <div class="note note--green">
+          <span class="note__tag">how we solved it</span>
+          <p>
+            From the form-controls wave on, each task ran in its own git worktree with
+            <code>node_modules</code> symlinked, its e2e server on port 4400 + N, and the dispatcher landed
+            finished tasks by rebase and fast-forward, never while a gate was running. Gates got their own
+            port after another project's dev server took the default one in the middle of a gate run.
+            Planning was split the same way: four to six planner agents per wave, one per batch, their files
+            concatenated by a script.
+          </p>
+        </div>
+
+        <h3>Reviews and gates</h3>
+
+        <p>
+          Per task, the conventions reviewer and the "second file" reviewer; per wave, one branch-wide code
+          review. Every branch-wide finding was reproduced as a failing spec before it was fixed, and fixes
+          ran in parallel lanes with disjoint paths. A wave ended with a gate: the full Jest run, the token
+          guard, the e2e suite over every page, and the stress timings.
+        </p>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Reviewer</th><th class="num">W0</th><th class="num">W1</th><th class="num">W2</th><th class="num">W3</th></tr></thead>
+            <tbody>
+              <tr><td>conventions reviewer, per task</td><td class="num">1.00</td><td class="num">1.63</td><td class="num">2.93</td><td class="num">1.38</td></tr>
+              <tr><td>second-file reviewer, per task</td><td class="num">1.81</td><td class="num">1.45</td><td class="num">0.48</td><td class="num">1.96</td></tr>
+              <tr><td>branch-wide review, per wave</td><td class="num">4.44</td><td class="num">3.38</td><td class="num">3.72</td><td class="num">3.87</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="c" style="font-size:0.86rem;margin-top:-10px">Code-changing findings per 100k tokens.</p>
+
+        <h3>The waves</h3>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Wave</th><th>Scope</th><th class="num">Commits</th><th class="num">Agent tokens</th><th class="num">Agent hours</th></tr></thead>
+            <tbody>
+              <tr><td>0 · Foundation</td><td>generators, theming runtime, 484 icons, preview app, e2e project, guards, 8 pilot components (button family, typography, tooltip, checkbox)</td><td class="num">71</td><td class="num">9.2 M</td><td class="num">10.1</td></tr>
+              <tr><td>1 · Display and layout</td><td>26 components: accordion to grid</td><td class="num">80</td><td class="num">≈ 13 M raw</td><td class="num">13.8</td></tr>
+              <tr><td>2 · Form controls</td><td>17 Signal Forms controls and a login-form example</td><td class="num">65</td><td class="num">9.5 M</td><td class="num">8.0</td></tr>
+              <tr><td>3 · Overlays, lists, menus</td><td>18 components: dialog, drawer, snackbar, select, dropdown, breadcrumb, bulk actions…</td><td class="num">102</td><td class="num">19.2 M</td><td class="num">15.7</td></tr>
+              <tr><td>Figma correction</td><td>tokens plus 25 component tasks across all 69</td><td class="num">63</td><td class="num">9.4 M</td><td class="num">8.7</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p>
+          Agent hours add up parallel work; the commit history from the first to the last commit spans 32
+          hours. De-duplicated, the four component waves cost about 48 to 51 million tokens, roughly 0.7
+          million per component including the foundation, the preview app, the e2e suite and every review.
+        </p>
+      </section>
+
+      <!-- ============================================================ -->
+      <section class="section" id="figma">
+        <h2 class="section__title"><span class="num">10.</span> The day Figma disagreed</h2>
+
+        <div class="note note--pink">
+          <span class="note__tag">challenge</span>
+          <p>
+            The rule through four waves was that where the React code and Figma differed, the code won. It
+            was in the deviation tables from the first pilot. Then the designer put the preview app next to
+            the Figma library. 58 of 184 system tokens differed. The primary colour in Figma is near-black;
+            the kit's was blue, and blue survives in Figma only for links and focus. The font, the text
+            colour, the greys, the button radius (a pill, not 6 px) and the dark-mode status colours all
+            differed. "Faithful to the code" had produced something faithful to nobody's current design.
+          </p>
+        </div>
+
+        <div class="note note--green">
+          <span class="note__tag">how we solved it</span>
+          <p>
+            A new architecture decision, the same afternoon: <strong>Figma decides how the kit looks; the
+            React code decides behaviour, API and structure.</strong> Then three steps: measure, encode,
+            correct.
+          </p>
+        </div>
+
+        <h3>Measure</h3>
+
+        <p>
+          A token diff ran immediately, and five read-only audit agents compared every component against
+          its Figma frame while the overlays wave kept going, without gating it. 524 rows in all, sorted into
+          token differences, wrong token bindings, component-level differences, things missing in the kit
+          and things the kit has that Figma does not. Of the 184 system tokens, 53 matched, 58 differed, 31
+          were kit-only and 42 were not comparable. Figma held another 225 variables with no kit counterpart.
+          The work came out at 51 of 69 components needing their own changes: 18 mechanical, 25 in CSS, 8
+          structural, the rest token-only.
+        </p>
+
+        <h3>Encode</h3>
+
+        <p>
+          The tempting fix was a live Figma export in the generator. That would put a credential and a
+          network call into a script that runs offline. Instead, one checked-in override file: a source block
+          (which Figma file, when it was read, which mode is light and which dark), 56 <code>set</code> rows and
+          7 <code>add</code> rows, each carrying the Figma variable path. The generator applies the override,
+          else upstream, and it refuses a row equal to upstream (so the file stays a list of differences), an
+          unknown name, or a row with neither a Figma path nor a reason.
+        </p>
+
+        <blockquote class="pull"><p>A later Figma version is a re-diff of one override file.</p></blockquote>
+
+        <p>
+          Two places keep the kit's value against Figma, and the designer is told: the full radius stays
+          9999 px, because Figma's value would square off a circle above 96 px; and the focus ring stays
+          opaque, because Figma's 50 % focus colour measures 1.87 to 2.40:1 and misses 3:1. Where Figma draws
+          no state the kit needs (focus, invalid, read-only), the kit keeps its own.
+        </p>
+
+        <h3>Correct</h3>
+
+        <p>
+          Stage 1, the tokens, landed and passed its gate: the generator first reads the override file with
+          byte-identical output, and only then do the system tokens take Figma's values. 4,284 unit tests,
+          949 e2e pages and 132 timings passed on it. Stage 2 is 25 component tasks in four batches. 23 of
+          them landed before the session's usage limit cut off five running agents, and I called a stop to
+          review what we had before going further. Two tasks, one fix round, two batch reviews and the end
+          gate remain, and no new wave starts until the kit and Figma agree and the designer has seen it.
+        </p>
+      </section>
+
+      <!-- ============================================================ -->
+      <section class="section" id="numbers">
+        <h2 class="section__title"><span class="num">11.</span> Numbers, and what is open</h2>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Measure</th><th class="num">Value</th></tr></thead>
+            <tbody>
+              <tr><td>Components ported (of 85 upstream folders)</td><td class="num">69</td></tr>
+              <tr><td>System tokens, light / dark (upstream 323 / 56)</td><td class="num">190 / 41</td></tr>
+              <tr><td>Icons generated</td><td class="num">484</td></tr>
+              <tr><td>CSS in the kit, lines · Sass files</td><td class="num">6,205 · 0</td></tr>
+              <tr><td>Kit source, TypeScript lines (non-spec, incl. generated icons)</td><td class="num">20,365</td></tr>
+              <tr><td>Spec files in the kit · lines</td><td class="num">151 · 49,480</td></tr>
+              <tr><td>Unit tests at the last gate</td><td class="num">4,284</td></tr>
+              <tr><td>E2E pages (axe, light and dark) · stress timings</td><td class="num">949 · 132</td></tr>
+              <tr><td>Keyboard tests</td><td class="num">467</td></tr>
+              <tr><td>Contrast pairs checked · listed exceptions</td><td class="num">125 · 59</td></tr>
+              <tr><td>Commits · elapsed time</td><td class="num">381 · 32 h</td></tr>
+              <tr><td>Agent tokens, five run reports (raw · de-duplicated)</td><td class="num">65.7 M · ≈ 57 – 60 M</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p>Open, in order:</p>
+
+        <ul>
+          <li>Finish the Figma correction, then a human click-through of every page with the designer.</li>
+          <li>The designer-facing preview pages: examples, the Design tab, the canvas controls.</li>
+          <li>The brand font. Figma uses it on every text style; no file ships until the licence is confirmed, and one weight does not exist as a file at all.</li>
+          <li>Waves 4 to 6, specced against Figma from the start: the data-heavy components, among them the table.</li>
+          <li>Adoption: the first product screen that renders a kit component, which is also when the e2e suite's place in the pipeline gets decided.</li>
+        </ul>
+      </section>
+
+      <!-- ============================================================ -->
+      <section class="section" id="again">
+        <h2 class="section__title"><span class="num">12.</span> If we did it again</h2>
+
+        <ul>
+          <li><strong>Decide the visual authority on day one, with the designer in the room.</strong> "The code wins" was the convenient rule for agents reading a codebase, and it cost a 25-task correction. The code is the behaviour; the design file is the look.</li>
+          <li><strong>Diff tokens before porting components.</strong> The token diff took minutes. Running it before the first wave would have caught the near-black primary before 69 components were built on the blue one.</li>
+          <li><strong>Build the designer pages before the second wave</strong>, not after the fourth. The preview app is how a designer finds a mismatch; the better it is, the earlier they find it.</li>
+          <li><strong>A worktree per agent from the first parallel wave.</strong> A shared checkout with nine writers is a red build.</li>
+          <li><strong>Plain CSS from the first commit.</strong> Custom properties with fallbacks do everything a token mixin did, and a consuming app needs nothing to read them.</li>
+          <li><strong>Make accessibility and performance tests, not review comments.</strong> axe on every page, a keyboard script per component, a contrast guard that does its own compositing, a stress page with an exact DOM budget. And an exceptions list for the colours that are not yours to change.</li>
+          <li><strong>Encode external truth as a checked-in diff.</strong> The override file is reviewable, offline, and a later design version is one re-diff.</li>
+        </ul>
+
+        <p>
+          The port is the easy half. Agreeing on what "correct" means, and making that agreement a file a
+          generator can read, is the half that decides whether the kit is used.
+        </p>
+      </section>
+    </main>
+
+    <footer class="footer" id="contact">
+      <h2 class="footer__title">Porting a design system?</h2>
+      <p class="footer__sub">
+        I build Angular component libraries and the agent workflows that port them: tokens, Signal Forms,
+        accessibility suites, preview apps for designers.
+      </p>
+      <a class="btn btn--primary" href="mailto:andriisiuta@gmail.com">andriisiuta@gmail.com</a>
+      <a class="btn btn--ghost" href="/articles/">More writing</a>
+      <p class="footer__note mono">© 2026 Andrii Siuta · written with the run reports open · deployed on GitHub Pages</p>
+    </footer>
+  </div>
+</body>
+</html>
