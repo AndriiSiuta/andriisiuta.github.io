@@ -9,7 +9,7 @@
   <meta property="og:description" content="8 agent roles, 4 hooks, a verification script, token ledgers in every run report, and the measurement that re-tiered the reviews. What worked, what cost too much, and what the six-week audit changed.">
   <meta property="og:type" content="article">
   <meta property="og:url" content="https://andriisiuta.github.io/articles/ai-harness/">
-  <meta property="article:published_time" content="2026-10-03">
+  <meta property="article:published_time" content="2026-10-01">
   <meta property="article:author" content="Andrii Siuta">
   <link rel="canonical" href="https://andriisiuta.github.io/articles/ai-harness/">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚡</text></svg>">
@@ -702,8 +702,8 @@ skills: writing-feature-spec, drawing-architecture-diagrams, writing-adr
 
         <p>
           Every run report ends with a ledger, and the ledger has two columns most harnesses do not keep:
-          <em>findings that changed code</em> and <em>findings later refuted</em>. The first report, on
-          2026-09-17, said why: "the ratio of code-changing findings per 100k tokens, per agent type, is the
+          <em>findings that changed code</em> and <em>findings later refuted</em>. The first report
+          said why: "the ratio of code-changing findings per 100k tokens, per agent type, is the
           number to steer the review budget by." It took five weeks to act on it.
         </p>
 
@@ -799,7 +799,7 @@ skills: writing-feature-spec, drawing-architecture-diagrams, writing-adr
         <h2 class="section__title"><span class="num">08.</span> The audit: what six weeks of sediment looks like</h2>
 
         <p>
-          On 2026-10-03, with 28 run reports behind it, the harness was audited the way it audits code: the
+          With 28 run reports behind it, the harness was audited the way it audits code: the
           always-loaded files read in full, three subagents sweeping for staleness, duplication and
           contradiction, and the ledger script run over every report. The verdict was fair: unusually well
           instrumented, and three things had grown past the point where they cost more than they returned.
