@@ -302,13 +302,13 @@
       <div class="hero__glow hero__glow--violet"></div>
       <p class="hero__eyebrow mono">$ ls src/lib<span class="cursor">▊</span></p>
       <h1 class="hero__title">Folders should name the business, not the framework</h1>
-      <p class="hero__dek"><code>components/</code>, <code>services/</code>, <code>models/</code> and <code>utils/</code> tell you which framework you are using, something you already knew. In an Nx Angular workspace they belong in exactly one kind of library: one whose users are developers, such as a UI kit. Everywhere else the top level of a folder should name what the business does. This article explains why, where the line sits, and what our git history said when we measured it.</p>
+      <p class="hero__dek"><code>components/</code>, <code>services/</code>, <code>models/</code> and <code>utils/</code> tell you which framework you are using, something you already knew. In an Nx Angular workspace they belong in exactly one kind of library: one whose users are developers, such as a UI kit. Everywhere else the top level of a folder should name what the business does. This article explains why, in the old language of cohesion, where the line sits, and what our git history said when we measured it.</p>
       <div class="hero__meta">
         <span>Andrii Siuta</span>
         <span>·</span>
         <span>October 2026</span>
         <span>·</span>
-        <span>~11 min read</span>
+        <span>~13 min read</span>
         <span class="chip">Angular</span>
         <span class="chip">Nx</span>
         <span class="chip">architecture</span>
@@ -323,14 +323,15 @@
         <ol>
           <li><a href="#test"><span class="n">01</span>The five-second test</a></li>
           <li><a href="#old"><span class="n">02</span>An old idea, now official</a></li>
-          <li><a href="#measured"><span class="n">03</span>What our git history said</a></li>
-          <li><a href="#four"><span class="n">04</span>One slice, four boundaries</a></li>
-          <li><a href="#kit"><span class="n">05</span>When type folders are right</a></li>
-          <li><a href="#two-level"><span class="n">06</span>The two-level rule in Nx</a></li>
-          <li><a href="#objection"><span class="n">07</span>The best objection, answered</a></li>
-          <li><a href="#agents"><span class="n">08</span>Agents read folders too</a></li>
-          <li><a href="#enforce"><span class="n">09</span>Making it stick</a></li>
-          <li><a href="#sources"><span class="n">10</span>Sources</a></li>
+          <li><a href="#cohesion"><span class="n">03</span>Cohesion: together for what reason?</a></li>
+          <li><a href="#measured"><span class="n">04</span>What our git history said</a></li>
+          <li><a href="#four"><span class="n">05</span>One slice, four boundaries</a></li>
+          <li><a href="#kit"><span class="n">06</span>When type folders are right</a></li>
+          <li><a href="#two-level"><span class="n">07</span>The two-level rule in Nx</a></li>
+          <li><a href="#objection"><span class="n">08</span>The best objection, answered</a></li>
+          <li><a href="#agents"><span class="n">09</span>Agents read folders too</a></li>
+          <li><a href="#enforce"><span class="n">10</span>Making it stick</a></li>
+          <li><a href="#sources"><span class="n">11</span>Sources</a></li>
         </ol>
       </nav>
     </header>
@@ -398,8 +399,50 @@
         </p>
       </section>
 
+      <section class="section" id="cohesion">
+        <h2 class="section__title"><span class="num">03.</span> Cohesion: together for what reason?</h2>
+        <p>
+          "Keep related things together" is not enough of a rule, because things can be related in many
+          ways at once. The question that matters is <em>why</em> they are together. In 1974 Stevens, Myers
+          and Constantine ranked the reasons from worst to best.<sup><a href="#s13">13</a>, <a href="#s14">14</a></sup> The scale is fifty years
+          old and reads like a review of a modern Angular repository:
+        </p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Cohesion</th><th>Grouped because…</th><th>What it looks like in Angular</th></tr></thead>
+            <tbody>
+              <tr><td>coincidental <span class="c">(worst)</span></td><td>no reason; it had to go somewhere</td><td><code>utils/</code>, <code>helpers.ts</code>, <code>common/</code></td></tr>
+              <tr><td><strong>logical</strong></td><td>they are the same <em>kind</em> of thing, "different by nature"</td><td><code>components/</code>, <code>services/</code>, <code>pipes/</code>, <code>models/</code></td></tr>
+              <tr><td>temporal</td><td>they run at the same time</td><td>an app-initialiser file doing five unrelated start-up jobs</td></tr>
+              <tr><td>procedural</td><td>they run in a fixed order</td><td>a <code>steps/</code> folder of a wizard, sorted by step number</td></tr>
+              <tr><td>communicational</td><td>they work on the same data</td><td>a data-access library around one entity: its model, API class and store</td></tr>
+              <tr><td>sequential</td><td>one part's output is the next part's input</td><td>an import flow: parse → map → validate</td></tr>
+              <tr><td>functional <span class="c">(best)</span></td><td>they all serve one well-defined task</td><td>a screen slice: <code>refund-request/</code> with its component, resolver, service and model</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>
+          A type folder is logical cohesion <em>by definition</em>. The order list component and the
+          invoice chart component sit together in <code>components/</code> because they share a decorator,
+          not because they share a reason to change. That is the second-worst rung, one step above
+          "it had to go somewhere", and <code>utils/</code> usually is that bottom rung. That is also why the
+          Angular guide warns against a file called <code>utils.ts</code>.
+        </p>
+        <p>
+          The real problem is that every file has several cohesions at once. The refund component is
+          logically related to every other component, communicationally related to the order model, and
+          functionally related to the refund resolver and the refund service. A folder can express only
+          one of them. Sorting by type picks the weakest and scatters the strongest across siblings.
+          Section 04 measures exactly that scattering.
+        </p>
+        <div class="note note--green">
+          <span class="note__tag">the rule, in cohesion terms</span>
+          <p>Group by the strongest cohesion the reader needs. In a feature, that is functional cohesion: the screen or use case. In a data layer, it is communicational: the entity. Logical cohesion is acceptable only where its parts never change together anyway, which is what makes a UI kit different (section 06).</p>
+        </div>
+      </section>
+
       <section class="section" id="measured">
-        <h2 class="section__title"><span class="num">03.</span> What our git history said</h2>
+        <h2 class="section__title"><span class="num">04.</span> What our git history said</h2>
         <p>
           "Things that change together live together" can be measured, and I could not find an Angular
           write-up that had done it. So before we re-sliced our feature libraries, I measured it on our
@@ -441,7 +484,7 @@
       </section>
 
       <section class="section" id="four">
-        <h2 class="section__title"><span class="num">04.</span> One slice, four boundaries</h2>
+        <h2 class="section__title"><span class="num">05.</span> One slice, four boundaries</h2>
         <p>
           In an Nx Angular workspace a business slice is not just tidier. It lines up with four boundaries
           the toolchain already draws, and a type folder lines up with none of them.
@@ -481,7 +524,7 @@
       </section>
 
       <section class="section" id="kit">
-        <h2 class="section__title"><span class="num">05.</span> When type folders are right</h2>
+        <h2 class="section__title"><span class="num">06.</span> When type folders are right</h2>
         <p>
           Type folders are not always wrong. Look at how real component libraries lay out their source.
           Angular Material, PrimeNG and Spartan have one folder per component (<code>button/</code>,
@@ -505,6 +548,13 @@
           change together live together.<sup><a href="#s2">2</a></sup> A kit sits on the reuse side, a feature on the change
           side. Type folders are a reuse grouping, so they fit the kit and fight the feature.
         </p>
+        <p>
+          In cohesion terms, each component folder of a kit (<code>button/</code>, <code>dialog/</code>) is
+          functionally cohesive: everything for one component, together. Taiga's <code>components/</code> then
+          groups those units logically one level up. That costs nothing, because the button and the dialog
+          never change together, and it gives developers a catalogue. Logical cohesion only hurts when it
+          splits parts that do change together, which is the normal case in a feature.
+        </p>
         <div class="table-wrap">
           <table>
             <thead><tr><th>Library</th><th>Its users</th><th>Top-level folders</th></tr></thead>
@@ -520,7 +570,7 @@
       </section>
 
       <section class="section" id="two-level">
-        <h2 class="section__title"><span class="num">06.</span> The two-level rule in Nx</h2>
+        <h2 class="section__title"><span class="num">07.</span> The two-level rule in Nx</h2>
         <p>
           Nx makes this rule easy to state because it already has two levels of name. Neither the Angular
           guide nor the Nx docs spell it out, so here it is.
@@ -552,7 +602,7 @@
       </section>
 
       <section class="section" id="objection">
-        <h2 class="section__title"><span class="num">07.</span> The best objection, answered</h2>
+        <h2 class="section__title"><span class="num">08.</span> The best objection, answered</h2>
         <p>
           The strongest case for type folders comes from Josh Comeau: deciding which feature a file belongs
           to is genuinely hard, the categories drift as the product changes, and sorting by type never
@@ -568,7 +618,7 @@
       </section>
 
       <section class="section" id="agents">
-        <h2 class="section__title"><span class="num">08.</span> Agents read folders too</h2>
+        <h2 class="section__title"><span class="num">09.</span> Agents read folders too</h2>
         <p>
           A newer reason: AI coding agents navigate a repository mostly by listing folders and searching for
           names, and every file they open costs context. Anthropic's context-engineering guide lists folder
@@ -587,7 +637,7 @@
       </section>
 
       <section class="section" id="enforce">
-        <h2 class="section__title"><span class="num">09.</span> Making it stick</h2>
+        <h2 class="section__title"><span class="num">10.</span> Making it stick</h2>
         <p>
           A folder convention without a check lasts about one busy sprint. Ours is held by a small spec that
           runs with the unit tests and has one row per library:
@@ -606,6 +656,7 @@
         </p>
         <h3>If you take one thing from this</h3>
         <ul>
+          <li>Ask why the files are together. A type folder is logical cohesion; a screen slice is functional cohesion. Pick the strongest.</li>
           <li>Ask who the library's users are. End users mean business slices; developers mean type folders are fine.</li>
           <li>Name level one (the library) for the business, always. Choose level two by the users.</li>
           <li>Measure co-change on your own history before arguing about taste.</li>
@@ -620,7 +671,7 @@
       </section>
 
       <section class="section" id="sources">
-        <h2 class="section__title"><span class="num">10.</span> Sources</h2>
+        <h2 class="section__title"><span class="num">11.</span> Sources</h2>
         <ol class="sources">
           <li id="s1">Robert C. Martin, "Screaming Architecture", 2011. <a href="https://blog.cleancoder.com/uncle-bob/2011/09/30/Screaming-Architecture.html">blog.cleancoder.com</a></li>
           <li id="s2">Robert C. Martin, <em>Clean Architecture</em>, ch. 13 "Component Cohesion", 2017. <a href="https://www.oreilly.com/library/view/clean-architecture-a/9780134494272/">O'Reilly</a></li>
@@ -634,6 +685,8 @@
           <li id="s10">Josh W. Comeau, "Delightful React File/Directory Structure". <a href="https://www.joshwcomeau.com/react/file-structure/">joshwcomeau.com</a></li>
           <li id="s11">Anthropic, "Effective context engineering for AI agents", 2025. <a href="https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents">anthropic.com</a></li>
           <li id="s12">arXiv 2604.13108, 2026 (preprint). <a href="https://arxiv.org/abs/2604.13108">arxiv.org</a></li>
+          <li id="s13">W. P. Stevens, G. J. Myers, L. L. Constantine, "Structured Design", <em>IBM Systems Journal</em> 13(2), 1974. <a href="https://doi.org/10.1147/sj.132.0115">doi.org/10.1147/sj.132.0115</a></li>
+          <li id="s14">E. Yourdon, L. L. Constantine, <em>Structured Design: Fundamentals of a Discipline of Computer Program and Systems Design</em>, 1979. Summary of the cohesion scale: <a href="https://en.wikipedia.org/wiki/Cohesion_(computer_science)">Wikipedia, "Cohesion (computer science)"</a></li>
         </ol>
         <p class="sources">Further reading: Kent C. Dodds, <a href="https://kentcdodds.com/blog/colocation">"Colocation"</a>; Manfred Steyer, <a href="https://www.angulararchitects.io/en/blog/modern-architectures-with-angular-part-1-strategic-design-with-sheriff-and-standalone-components/">strategic design with Sheriff and standalone components</a>; Nx, <a href="https://nx.dev/docs/concepts/decisions/project-dependency-rules">project dependency rules</a>.</p>
       </section>
