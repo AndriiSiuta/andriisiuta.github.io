@@ -1,0 +1,651 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Folders should name the business — Andrii Siuta</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Why components/, services/ and utils/ folders belong only in libraries whose consumer is a developer, like a UI kit, and why everything else in an Nx Angular workspace should be sliced by business capability. With a co-change measurement from a real codebase.">
+  <meta property="og:title" content="Folders should name the business, not the framework">
+  <meta property="og:description" content="Why components/, services/ and utils/ folders belong only in libraries whose consumer is a developer, like a UI kit, and why everything else in an Nx Angular workspace should be sliced by business capability. With a co-change measurement from a real codebase.">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://andriisiuta.github.io/articles/folders-name-the-business/">
+  <meta property="article:published_time" content="2026-10-05">
+  <meta property="article:author" content="Andrii Siuta">
+  <link rel="canonical" href="https://andriisiuta.github.io/articles/folders-name-the-business/">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚡</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #06060f;
+      --bg-card: #0d0d1c;
+      --bg-card-hover: #12122a;
+      --border: #1e1e3a;
+      --text: #d6d6e7;
+      --text-dim: #8a8aa3;
+      --heading: #f4f4fb;
+      --pink: #ff3e7f;
+      --violet: #a855f7;
+      --red: #f0060b;
+      --green: #3ddc97;
+      --gradient: linear-gradient(90deg, #f0060b 0%, #cc26d5 55%, #7702ff 100%);
+      --gradient-soft: linear-gradient(90deg, #ff3e7f 0%, #a855f7 100%);
+      --font-body: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+      --font-head: 'Space Grotesk', var(--font-body);
+      --font-mono: 'JetBrains Mono', ui-monospace, 'Fira Code', monospace;
+      color-scheme: dark;
+    }
+
+    * { box-sizing: border-box; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      margin: 0;
+      background:
+        radial-gradient(ellipse 60% 40% at 70% -10%, rgba(119, 2, 255, 0.14), transparent),
+        radial-gradient(ellipse 50% 35% at 20% 10%, rgba(255, 62, 127, 0.1), transparent),
+        var(--bg);
+      color: var(--text);
+      font-family: var(--font-body);
+      font-size: 16px;
+      line-height: 1.65;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    ::selection { background: rgba(255, 62, 127, 0.35); color: #fff; }
+
+    .mono { font-family: var(--font-mono); }
+    .accent { color: var(--pink); }
+
+    a { color: var(--pink); text-decoration: none; }
+    a:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+    .nav {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px max(16px, calc(50vw - 506px));
+      backdrop-filter: blur(12px);
+      background: rgba(6, 6, 15, 0.7);
+      border-bottom: 1px solid rgba(30, 30, 58, 0.6);
+    }
+
+    .nav__brand { font-family: var(--font-head); font-weight: 700; font-size: 1.4rem; color: var(--heading); }
+    .nav__brand:hover { text-decoration: none; }
+    .nav__links { display: flex; gap: 22px; }
+    .nav__links a { color: var(--text-dim); font-size: 0.9rem; transition: color 0.2s; }
+    .nav__links a:hover { color: var(--pink); text-decoration: none; }
+
+    .wrap { max-width: 1060px; margin: 0 auto; padding: 0 16px; }
+    .article { max-width: 760px; margin: 0 auto; }
+
+    .hero { position: relative; padding: 80px 0 40px; }
+    .hero__glow { position: absolute; border-radius: 50%; filter: blur(90px); pointer-events: none; }
+    .hero__glow--pink { width: 380px; height: 380px; top: -60px; right: -80px; background: rgba(255, 62, 127, 0.16); }
+    .hero__glow--violet { width: 300px; height: 300px; bottom: -40px; left: -100px; background: rgba(119, 2, 255, 0.16); }
+    .hero__eyebrow { color: var(--pink); font-size: 0.95rem; margin: 0 0 14px; }
+    .cursor { animation: blink 1.1s step-end infinite; }
+    @keyframes blink { 50% { opacity: 0; } }
+
+    .hero__title {
+      font-family: var(--font-head);
+      font-size: clamp(2rem, 5.2vw, 3.4rem);
+      font-weight: 700;
+      line-height: 1.08;
+      margin: 0 0 20px;
+      background: var(--gradient);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      filter: drop-shadow(0 0 24px rgba(204, 38, 213, 0.25));
+    }
+
+    .hero__dek { color: var(--text-dim); font-size: 1.12rem; line-height: 1.6; margin: 0 0 26px; max-width: 700px; }
+    .hero__meta { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; color: var(--text-dim); font-size: 0.85rem; }
+
+    .chip {
+      font-family: var(--font-mono);
+      font-size: 0.74rem;
+      color: var(--text);
+      background: rgba(168, 85, 247, 0.1);
+      border: 1px solid rgba(168, 85, 247, 0.3);
+      border-radius: 999px;
+      padding: 3px 11px;
+    }
+
+    .metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin: 30px 0 10px; }
+
+    .metric {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 18px 14px;
+      text-align: center;
+      transition: border-color 0.25s, transform 0.25s;
+    }
+
+    .metric:hover { border-color: rgba(255, 62, 127, 0.5); transform: translateY(-3px); }
+
+    .metric__value {
+      display: block;
+      font-family: var(--font-head);
+      font-size: 1.55rem;
+      font-weight: 700;
+      line-height: 1.15;
+      letter-spacing: -0.01em;
+      background: var(--gradient-soft);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      white-space: nowrap;
+    }
+
+    .metric__label { display: block; color: var(--text-dim); font-size: 0.8rem; margin-top: 6px; }
+
+    .toc { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 20px 24px; margin: 36px 0 10px; }
+    .toc__title { font-family: var(--font-mono); font-size: 0.78rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.08em; margin: 0 0 12px; }
+    .toc ol { margin: 0; padding: 0; list-style: none; columns: 2; column-gap: 28px; }
+    .toc li { margin: 0 0 7px; break-inside: avoid; font-size: 0.93rem; }
+    .toc li a { color: var(--text); }
+    .toc li a:hover { color: var(--pink); text-decoration: none; }
+    .toc .n { font-family: var(--font-mono); color: var(--pink); font-size: 0.8rem; margin-right: 8px; }
+
+    .section { padding: 54px 0 4px; }
+
+    .section__title {
+      font-family: var(--font-head);
+      font-size: 1.65rem;
+      color: var(--heading);
+      margin: 0 0 24px;
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+      line-height: 1.25;
+    }
+
+    .section__title::after { content: ''; flex: 1; height: 1px; min-width: 24px; background: linear-gradient(90deg, var(--border), transparent); }
+    .section__title .num { font-family: var(--font-mono); color: var(--pink); font-size: 1rem; flex-shrink: 0; }
+
+    h3 { font-family: var(--font-head); color: var(--heading); font-size: 1.15rem; margin: 34px 0 12px; }
+
+    p { margin: 0 0 16px; }
+    .article ul, .article ol { margin: 0 0 18px; padding-left: 22px; }
+    .article li { margin-bottom: 7px; }
+    .article li::marker { color: var(--pink); }
+    strong { color: var(--heading); font-weight: 600; }
+
+    code {
+      font-family: var(--font-mono);
+      font-size: 0.86em;
+      background: rgba(168, 85, 247, 0.1);
+      border: 1px solid rgba(168, 85, 247, 0.22);
+      border-radius: 5px;
+      padding: 1px 6px;
+      color: var(--text);
+      word-break: break-word;
+    }
+
+    pre {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 18px 20px;
+      margin: 0 0 20px;
+      overflow-x: auto;
+      font-size: 0.82rem;
+      line-height: 1.6;
+    }
+
+    pre code { background: none; border: 0; padding: 0; font-size: inherit; color: var(--text); word-break: normal; }
+
+    .pre__label { display: block; font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-dim); margin: 0 0 10px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+
+    .c { color: var(--text-dim); }
+    .s { color: var(--pink); }
+    .k { color: var(--violet); }
+
+    .pull {
+      margin: 28px 0;
+      padding: 6px 0 6px 22px;
+      border-left: 3px solid transparent;
+      border-image: var(--gradient-soft) 1;
+      font-family: var(--font-head);
+      font-size: 1.2rem;
+      line-height: 1.45;
+      color: var(--heading);
+    }
+
+    .pull p { margin: 0; }
+
+    .note { border: 1px solid var(--border); border-left: 3px solid var(--violet); border-radius: 10px; padding: 14px 18px; background: var(--bg-card); margin: 0 0 20px; font-size: 0.95rem; }
+    .note p:last-child { margin: 0; }
+    .note__tag { display: inline-block; font-family: var(--font-mono); font-size: 0.72rem; color: var(--violet); border: 1px solid rgba(168, 85, 247, 0.5); border-radius: 999px; padding: 2px 9px; margin-bottom: 8px; }
+    .note--pink { border-left-color: var(--pink); }
+    .note--pink .note__tag { color: var(--pink); border-color: rgba(255, 62, 127, 0.5); }
+    .note--green { border-left-color: var(--green); }
+    .note--green .note__tag { color: var(--green); border-color: rgba(61, 220, 151, 0.5); }
+
+    .table-wrap { overflow-x: auto; margin: 0 0 22px; border: 1px solid var(--border); border-radius: 12px; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.9rem; min-width: 480px; }
+    th, td { padding: 10px 14px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--border); }
+    th { font-family: var(--font-mono); font-weight: 600; font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-dim); background: var(--bg-card); }
+    tr:last-child td { border-bottom: 0; }
+    tbody tr:hover td { background: rgba(168, 85, 247, 0.05); }
+    td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    td:first-child code { white-space: nowrap; }
+
+    figure { margin: 26px 0 24px; }
+    figure svg { display: block; width: 100%; max-width: 100%; height: auto; }
+    figure svg text { font-family: var(--font-mono); }
+    figcaption { color: var(--text-dim); font-size: 0.86rem; margin-top: 12px; line-height: 1.5; }
+
+    .footer { text-align: center; padding: 80px 0 50px; }
+    .footer__title { font-family: var(--font-head); font-size: clamp(1.4rem, 4vw, 2rem); color: var(--heading); margin: 0 0 12px; }
+    .footer__sub { color: var(--text-dim); max-width: 520px; margin: 0 auto 26px; }
+
+    .btn { display: inline-block; padding: 12px 26px; border-radius: 8px; font-weight: 600; font-size: 0.95rem; transition: transform 0.2s, box-shadow 0.2s; }
+    .btn:hover { text-decoration: none; transform: translateY(-2px); }
+    .btn--primary { background: var(--gradient-soft); color: #fff; box-shadow: 0 0 24px rgba(255, 62, 127, 0.35); }
+    .btn--primary:hover { box-shadow: 0 0 36px rgba(168, 85, 247, 0.5); }
+    .btn--ghost { border: 1px solid var(--border); color: var(--text); margin-left: 10px; }
+    .btn--ghost:hover { border-color: var(--pink); color: var(--pink); }
+    .footer__note { margin-top: 40px; color: var(--text-dim); font-size: 0.75rem; opacity: 0.7; }
+
+    @media (max-width: 640px) {
+      .hero { padding-top: 56px; }
+      .nav__links { gap: 14px; }
+      .nav__links a { font-size: 0.8rem; }
+      .metrics { grid-template-columns: repeat(2, 1fr); }
+      .metric__value { font-size: 1.3rem; }
+      .toc ol { columns: 1; }
+      figure { overflow-x: auto; }
+      figure svg { min-width: 640px; }
+      .pull { font-size: 1.05rem; }
+      .btn--ghost { margin-left: 0; margin-top: 10px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      .cursor { animation: none; }
+      .metric, .btn { transition: none; }
+    }
+    .tree { font-family: var(--font-mono); font-size: 0.82rem; line-height: 1.55; }
+    .tree .d { color: var(--violet); }
+    .tree .f { color: var(--text); }
+    .tree .x { color: var(--text-dim); }
+    .two { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .two pre { margin: 0 0 20px; }
+    @media (max-width: 640px) { .two { grid-template-columns: 1fr; } }
+    .sources { font-size: 0.86rem; color: var(--text-dim); padding-left: 22px; }
+    .sources li { margin-bottom: 6px; word-break: break-word; }
+    sup a { font-family: var(--font-mono); font-size: 0.7rem; }
+  </style>
+<body>
+  <nav class="nav">
+    <a class="nav__brand" href="/">AS<span class="accent">.</span></a>
+    <div class="nav__links">
+      <a href="/">CV</a>
+      <a href="/articles/">Writing</a>
+      <a href="https://github.com/AndriiSiuta" target="_blank" rel="noopener">GitHub</a>
+      <a href="https://www.linkedin.com/in/andrii-siuta/" target="_blank" rel="noopener">LinkedIn</a>
+    </div>
+  </nav>
+
+  <div class="wrap">
+    <header class="hero">
+      <div class="hero__glow hero__glow--pink"></div>
+      <div class="hero__glow hero__glow--violet"></div>
+      <p class="hero__eyebrow mono">$ ls src/lib<span class="cursor">▊</span></p>
+      <h1 class="hero__title">Folders should name the business, not the framework</h1>
+      <p class="hero__dek"><code>components/</code>, <code>services/</code>, <code>models/</code> and <code>utils/</code> tell you which framework you are using, something you already knew. In an Nx Angular workspace they belong in exactly one kind of library: one whose users are developers, such as a UI kit. Everywhere else the top level of a folder should name what the business does. This article explains why, where the line sits, and what our git history said when we measured it.</p>
+      <div class="hero__meta">
+        <span>Andrii Siuta</span>
+        <span>·</span>
+        <span>October 2026</span>
+        <span>·</span>
+        <span>~11 min read</span>
+        <span class="chip">Angular</span>
+        <span class="chip">Nx</span>
+        <span class="chip">architecture</span>
+      </div>
+      <div class="metrics">
+        <div class="metric"><span class="metric__value">359</span><span class="metric__label">domain changes measured</span></div>
+        <div class="metric"><span class="metric__value">30 %</span><span class="metric__label">touched 2+ type folders</span></div>
+        <div class="metric"><span class="metric__value">13 %</span><span class="metric__label">touched 3 or more</span></div>
+      </div>
+      <nav class="toc" aria-label="Contents">
+        <p class="toc__title">Contents</p>
+        <ol>
+          <li><a href="#test"><span class="n">01</span>The five-second test</a></li>
+          <li><a href="#old"><span class="n">02</span>An old idea, now official</a></li>
+          <li><a href="#measured"><span class="n">03</span>What our git history said</a></li>
+          <li><a href="#four"><span class="n">04</span>One slice, four boundaries</a></li>
+          <li><a href="#kit"><span class="n">05</span>When type folders are right</a></li>
+          <li><a href="#two-level"><span class="n">06</span>The two-level rule in Nx</a></li>
+          <li><a href="#objection"><span class="n">07</span>The best objection, answered</a></li>
+          <li><a href="#agents"><span class="n">08</span>Agents read folders too</a></li>
+          <li><a href="#enforce"><span class="n">09</span>Making it stick</a></li>
+          <li><a href="#sources"><span class="n">10</span>Sources</a></li>
+        </ol>
+      </nav>
+    </header>
+
+    <main class="article">
+      <section class="section" id="test">
+        <h2 class="section__title"><span class="num">01.</span> The five-second test</h2>
+        <p>Open two feature libraries from the same product and give yourself five seconds with each:</p>
+        <div class="two">
+<pre class="tree"><span class="pre__label">library A</span><code><span class="d">src/lib/</span>
+  <span class="d">components/</span>
+  <span class="d">services/</span>
+  <span class="d">models/</span>
+  <span class="d">resolvers/</span>
+  <span class="d">utils/</span>
+  <span class="f">routes.ts</span></code></pre>
+<pre class="tree"><span class="pre__label">library B</span><code><span class="d">src/lib/</span>
+  <span class="d">order-list/</span>
+  <span class="d">order-details/</span>
+  <span class="d">refund-request/</span>
+  <span class="d">cancel-order-dialog/</span>
+  <span class="f">orders.service.ts</span>
+  <span class="f">orders.routes.ts</span></code></pre>
+        </div>
+        <p>
+          Library A tells you that this is an Angular project. You knew that from <code>package.json</code>.
+          It does not tell you what the library does, which screens it has, or where to start reading for
+          the bug in the refund flow. Library B tells you all three before you open a file.
+        </p>
+        <p>
+          That is the whole argument. A folder name is the cheapest documentation a codebase has, and
+          every reader sees it, whether a new developer, a reviewer or an AI agent. Spending it on
+          <code>components</code> wastes it.
+        </p>
+        <blockquote class="pull"><p>Every app has components. Only yours has refunds.</p></blockquote>
+      </section>
+
+      <section class="section" id="old">
+        <h2 class="section__title"><span class="num">02.</span> An old idea, now official</h2>
+        <p>
+          None of this is new. In 2011 Robert C. Martin asked what the top-level structure of a system
+          "screams", and answered that it should be the use cases, not the framework: <em>"Frameworks are
+          tools to be used, not architectures to be conformed to."</em><sup><a href="#s1">1</a></sup> His Common
+          Closure Principle gives the mechanical version: <em>"Gather into components those classes that
+          change for the same reasons and at the same times."</em><sup><a href="#s2">2</a></sup> Jimmy Bogard's vertical
+          slices say it again from the other side: <em>"Minimize coupling between slices, and maximize coupling in
+          a slice."</em><sup><a href="#s3">3</a></sup> The Java community called it <em>package by feature, not layer</em> and gave it
+          its best test: <em>"an item has maximum modularity only if it can be deleted in a single
+          operation."</em><sup><a href="#s4">4</a></sup>
+        </p>
+        <p>What is new is that the Angular and Nx docs now say the same thing outright. The current Angular style guide:</p>
+        <blockquote class="pull"><p>"Avoid creating subdirectories based on the type of code that lives in those directories. For example, avoid creating directories like <code>components</code>, <code>directives</code>, and <code>services</code>."<sup><a href="#s5">5</a></sup></p></blockquote>
+        <p>
+          The same guide asks you to avoid generic file names such as <code>helpers.ts</code>,
+          <code>utils.ts</code> and <code>common.ts</code>, and to keep tests beside the code they test.<sup><a href="#s5">5</a></sup>
+          Nx says it one level up, about libraries: <em>"Group libraries by the application or business domain
+          they serve, not by their technical type. Projects that change together should sit
+          together."</em><sup><a href="#s6">6</a></sup>
+        </p>
+        <p>
+          The older Angular guide recommended folders by feature but still showed a <code>shared/</code> full of
+          <code>components/</code> and <code>services/</code>.<sup><a href="#s7">7</a></sup> The rewrite drops that hedge. If your
+          workspace was generated before it, the type folders you have came from the old advice, not from
+          a decision anyone made.
+        </p>
+      </section>
+
+      <section class="section" id="measured">
+        <h2 class="section__title"><span class="num">03.</span> What our git history said</h2>
+        <p>
+          "Things that change together live together" can be measured, and I could not find an Angular
+          write-up that had done it. So before we re-sliced our feature libraries, I measured it on our
+          own repository.
+        </p>
+        <p>
+          The codebase at the time was a single Angular app with a dozen business domains, each a
+          folder organised by kind: <code>components/</code>, <code>services/</code>, <code>models/</code>,
+          <code>resolvers/</code>, <code>store/</code>, <code>utils/</code> and so on. I took every non-merge
+          commit from six and a half months of history and, for each domain a commit touched, counted how
+          many of that domain's type folders it changed.
+        </p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Type folders touched in one domain, per commit</th><th class="num">Domain changes</th><th class="num">Share</th></tr></thead>
+            <tbody>
+              <tr><td>1</td><td class="num">251</td><td class="num">70 %</td></tr>
+              <tr><td>2 or more</td><td class="num">108</td><td class="num">30 %</td></tr>
+              <tr><td>3 or more</td><td class="num">47</td><td class="num">13 %</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>
+          Almost a third of the time, one change to one business capability was spread across sibling
+          folders that existed only to sort files by Angular concept. The typical shape: a new field on a
+          screen touches the model, the service that loads it, the resolver, and the component that shows
+          it, in four folders. In the review diff those four files sit far apart and look unrelated.
+        </p>
+        <p>
+          The 70 % touching only one folder is not the good news it looks like. Most of those are
+          one-file fixes, and a one-file change cannot be scattered whatever the layout. The question
+          that matters is what happens to the changes that span files. Those are the feature work, and
+          that is where the scattering lived.
+        </p>
+        <div class="note">
+          <span class="note__tag">try it on your repo</span>
+          <p>List the files of each commit, map each path to <code>(domain, first folder under the domain)</code>, and count the distinct type folders per domain per commit. It takes about twenty lines of script. If the share at 2+ is high, your folders are sorted along an axis your changes do not follow.</p>
+        </div>
+      </section>
+
+      <section class="section" id="four">
+        <h2 class="section__title"><span class="num">04.</span> One slice, four boundaries</h2>
+        <p>
+          In an Nx Angular workspace a business slice is not just tidier. It lines up with four boundaries
+          the toolchain already draws, and a type folder lines up with none of them.
+        </p>
+        <figure>
+          <svg viewBox="0 0 760 330" role="img" aria-labelledby="four-t four-d">
+            <title id="four-t">One slice, four boundaries</title>
+            <desc id="four-d">On the left a business slice: its route, lazy chunk, route injector and Nx project all coincide. On the right a services folder: it spans every route, ships in every chunk, belongs to no injector and is not a project.</desc>
+            <g font-size="13" fill="#d6d6e7">
+              <text x="40" y="24" fill="#3ddc97">business slice: order-details/</text>
+              <rect x="40" y="40" width="320" height="270" rx="12" fill="#0d0d1c" stroke="#3ddc97"/>
+              <rect x="64" y="64" width="272" height="44" rx="8" fill="none" stroke="#1e1e3a"/>
+              <text x="80" y="91">route</text><text x="190" y="91" fill="#8a8aa3">/orders/:id</text>
+              <rect x="64" y="122" width="272" height="44" rx="8" fill="none" stroke="#1e1e3a"/>
+              <text x="80" y="149">lazy chunk</text><text x="190" y="149" fill="#8a8aa3">loaded on visit</text>
+              <rect x="64" y="180" width="272" height="44" rx="8" fill="none" stroke="#1e1e3a"/>
+              <text x="80" y="207">DI scope</text><text x="190" y="207" fill="#8a8aa3">route providers</text>
+              <rect x="64" y="238" width="272" height="44" rx="8" fill="none" stroke="#1e1e3a"/>
+              <text x="80" y="265">nx affected</text><text x="190" y="265" fill="#8a8aa3">the feature lib</text>
+              <text x="400" y="24" fill="#ff3e7f">type folder: services/</text>
+              <rect x="400" y="40" width="320" height="270" rx="12" fill="#0d0d1c" stroke="#ff3e7f" stroke-dasharray="6 5"/>
+              <text x="424" y="91">route</text><text x="534" y="91" fill="#8a8aa3">every route</text>
+              <text x="424" y="149">lazy chunk</text><text x="534" y="149" fill="#8a8aa3">split across all</text>
+              <text x="424" y="207">DI scope</text><text x="534" y="207" fill="#8a8aa3">none of its own</text>
+              <text x="424" y="265">nx affected</text><text x="534" y="265" fill="#8a8aa3">not a unit</text>
+              <text x="40" y="326" fill="#8a8aa3" font-size="11">left: the four boundaries coincide · right: the folder cuts across all four</text>
+            </g>
+          </svg>
+          <figcaption>A screen slice is a route, a lazy chunk, a DI scope and (at library level) a unit of <code>nx affected</code>. A <code>services/</code> folder is none of these, so the tools cannot use it.</figcaption>
+        </figure>
+        <ul>
+          <li><strong>Route.</strong> A slice is what a URL points to. The route file lists the slices; the folder list and the route list read the same.</li>
+          <li><strong>Lazy chunk.</strong> A feature library is lazy-loaded. What sits in it ships when the user visits it. Code sorted into <code>shared/services/</code> ships wherever any importer goes.</li>
+          <li><strong>DI scope.</strong> A domain's providers array sits on its root route. Services that belong to a slice live beside it and die with it. Nobody needs to ask whether a service in <code>services/</code> is still used.</li>
+          <li><strong>The unit of <code>nx affected</code>.</strong> Nx re-tests and re-builds projects, not folders. Libraries cut along business lines keep the affected set small. Nx says it directly: <em>"when organizing projects you should think about your business domains"</em>, and the finer the projects, the more effective affected and the cache become.<sup><a href="#s8">8</a></sup></li>
+        </ul>
+      </section>
+
+      <section class="section" id="kit">
+        <h2 class="section__title"><span class="num">05.</span> When type folders are right</h2>
+        <p>
+          Type folders are not always wrong. Look at how real component libraries lay out their source.
+          Angular Material, PrimeNG and Spartan have one folder per component (<code>button/</code>,
+          <code>dialog/</code>, <code>table/</code>).<sup><a href="#s9">9</a></sup> Taiga UI goes further and uses literal type
+          folders: <code>components/</code>, <code>directives/</code>, <code>pipes/</code>, <code>tokens/</code>,
+          <code>utils/</code>. RxJS keeps <code>operators/</code>, <code>observable/</code> and <code>scheduler/</code>.<sup><a href="#s9">9</a></sup>
+          These are some of the best-maintained libraries in the ecosystem. They are not breaking the rule.
+          They are following it.
+        </p>
+        <p>The test that explains it:</p>
+        <blockquote class="pull"><p>Name the folders in the vocabulary of the library's users. When the user is a developer, the developer's vocabulary is the domain.</p></blockquote>
+        <p>
+          The users of a UI kit are developers looking for "the dialog" or "a pipe". For them
+          <code>dialog/</code> is a business capability, and <code>directives/</code> is how they search. The users
+          of an order-management screen are operations staff who think in orders, refunds and
+          cancellations. Nobody in that building has ever asked for "a service".
+        </p>
+        <p>
+          Martin's component principles give the deeper reason. A library many teams consume is grouped for
+          reuse: things used together ship together. An application is grouped for change: things that
+          change together live together.<sup><a href="#s2">2</a></sup> A kit sits on the reuse side, a feature on the change
+          side. Type folders are a reuse grouping, so they fit the kit and fight the feature.
+        </p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Library</th><th>Its users</th><th>Top-level folders</th></tr></thead>
+            <tbody>
+              <tr><td>UI kit / design system</td><td>developers</td><td>per component, or by kind (<code>components/ directives/ pipes/</code>): fine</td></tr>
+              <tr><td>util</td><td>developers</td><td>by kind or by topic: fine (but no file called <code>utils.ts</code>)</td></tr>
+              <tr><td>data-access</td><td>other code</td><td><code>models/ services/ store/</code>: fine, because the type <em>is</em> the axis of change in a data layer</td></tr>
+              <tr><td>feature</td><td>end users</td><td>slices named for screens and use cases, never type folders</td></tr>
+              <tr><td>the app</td><td>everyone</td><td>no code folders at all; bootstrap and config only</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="section" id="two-level">
+        <h2 class="section__title"><span class="num">06.</span> The two-level rule in Nx</h2>
+        <p>
+          Nx makes this rule easy to state because it already has two levels of name. Neither the Angular
+          guide nor the Nx docs spell it out, so here it is.
+        </p>
+        <ol>
+          <li><strong>Level one, the library: always business first.</strong> <code>libs/&lt;domain&gt;/&lt;type&gt;</code>. The scope folder is a domain such as <code>orders</code>, <code>catalog</code> or <code>billing</code>. The type (<code>feature</code>, <code>ui</code>, <code>data-access</code>, <code>util</code>) is the second word, and the boundary lint reads it from a tag. Even a technical layer is filed under its business owner.</li>
+          <li><strong>Level two, inside the library: it depends on who the users are.</strong> A feature library is sliced by screen. A ui, util or data-access library may sort by kind, because its users are developers or other code.</li>
+        </ol>
+<pre class="tree"><span class="pre__label">both levels at once</span><code><span class="d">libs/</span>
+  <span class="d">orders/</span>                      <span class="x">level 1: the business</span>
+    <span class="d">feature/src/lib/</span>
+      <span class="d">order-list/</span>              <span class="x">level 2: screens, for end users</span>
+      <span class="d">refund-request/</span>
+      <span class="f">orders.routes.ts</span>
+    <span class="d">data-access/src/lib/</span>
+      <span class="d">models/</span>                  <span class="x">level 2: kinds, for other code</span>
+      <span class="d">services/</span>
+      <span class="d">store/</span>
+  <span class="d">ui-kit/</span>
+    <span class="d">core/src/lib/</span>
+      <span class="d">button/</span>                  <span class="x">level 2: components, for developers</span>
+      <span class="d">dialog/</span></code></pre>
+        <p>
+          Note what the first level does to <code>shared</code>. A <code>shared/components</code> library is a type
+          folder promoted to a project, with all the problems above at a larger scale. Keep shared for what
+          genuinely has no business owner (the HTTP layer, the design-system wrappers) and send everything
+          else home to its domain.
+        </p>
+      </section>
+
+      <section class="section" id="objection">
+        <h2 class="section__title"><span class="num">07.</span> The best objection, answered</h2>
+        <p>
+          The strongest case for type folders comes from Josh Comeau: deciding which feature a file belongs
+          to is genuinely hard, the categories drift as the product changes, and sorting by type never
+          needs a decision.<sup><a href="#s10">10</a></sup> He is right that slicing takes judgement. In an Nx Angular workspace
+          the costs he worries about are mostly gone:
+        </p>
+        <ul>
+          <li><strong>Moving is cheap.</strong> Renaming a slice is a folder move and a relative-import fix. Moving a library is a generator run, and Nx's own docs answer "can you change the folder structure later?" with a plain yes.<sup><a href="#s6">6</a></sup> Getting a slice name wrong costs one small PR.</li>
+          <li><strong>The routes file settles most of it.</strong> A screen is a slice. A file used by two screens goes up to the library root; a file used by two domains goes down into <code>ui</code> or <code>data-access</code>. That is three rules, not a judgement call per file.</li>
+          <li><strong>The lint catches the expensive mistakes.</strong> A slice placed in the wrong domain shows up as a boundary violation the day it imports something it should not.</li>
+          <li><strong>Type folders drift too, just silently.</strong> A <code>utils/</code> folder never looks wrong; it just grows. A misplaced business slice looks wrong, which is exactly why it gets fixed.</li>
+        </ul>
+      </section>
+
+      <section class="section" id="agents">
+        <h2 class="section__title"><span class="num">08.</span> Agents read folders too</h2>
+        <p>
+          A newer reason: AI coding agents navigate a repository mostly by listing folders and searching for
+          names, and every file they open costs context. Anthropic's context-engineering guide lists folder
+          hierarchies and naming conventions among the signals that help <em>"both humans and
+          agents"</em>.<sup><a href="#s11">11</a></sup> A 2026 preprint measured agents taking a third fewer navigation steps when they
+          were given architecture context, though it measured written descriptions, not folder
+          layouts.<sup><a href="#s12">12</a></sup> The evidence that folder layout itself matters is still thin, so I will only
+          describe what we see.
+        </p>
+        <p>
+          When the task is "add a field to the refund screen", a sliced library hands the agent the four
+          files it needs in one directory listing. A type-sorted one makes it search four folders and
+          guess which of a dozen services is the right one. Our agents get the same "where does it go"
+          table our developers do, and a misplaced file is the same check failure for both.
+        </p>
+      </section>
+
+      <section class="section" id="enforce">
+        <h2 class="section__title"><span class="num">09.</span> Making it stick</h2>
+        <p>
+          A folder convention without a check lasts about one busy sprint. Ours is held by a small spec that
+          runs with the unit tests and has one row per library:
+        </p>
+        <ul>
+          <li>It reads the library's <code>type:</code> tag from its project file.</li>
+          <li>For a <code>feature</code> library, it fails if the top level of <code>src/lib</code> contains a technical name (<code>components</code>, <code>services</code>, <code>models</code>, <code>utils</code>, <code>pipes</code>, <code>directives</code> and the rest) or a Feature-Sliced Design segment name.</li>
+          <li>For a <code>data-access</code> library, it allows only a closed list of kind folders.</li>
+          <li>For <code>ui</code> and <code>util</code>, it allows kind folders, so a kit keeps its natural shape.</li>
+          <li>It fails if a file at a feature library's root is used by only one slice, because that file belongs in the slice.</li>
+        </ul>
+        <p>
+          It is under two hundred lines and runs in about a second. When we re-sliced the feature libraries it
+          took 852 file renames across 13 libraries, and the spec has kept the old shape from creeping back
+          since.
+        </p>
+        <h3>If you take one thing from this</h3>
+        <ul>
+          <li>Ask who the library's users are. End users mean business slices; developers mean type folders are fine.</li>
+          <li>Name level one (the library) for the business, always. Choose level two by the users.</li>
+          <li>Measure co-change on your own history before arguing about taste.</li>
+          <li>Back the rule with a spec keyed on the Nx <code>type:</code> tag, so it holds for people and agents alike.</li>
+        </ul>
+        <blockquote class="pull"><p>Your folders are the first page of your documentation. Write it about your business.</p></blockquote>
+        <p>
+          How the workspace these rules come from is laid out end to end is in
+          <a href="/articles/nx-folder-structure/">Where does this file go?</a>, and how we got there is the
+          <a href="/articles/nx-migration/">Nx migration case study</a>.
+        </p>
+      </section>
+
+      <section class="section" id="sources">
+        <h2 class="section__title"><span class="num">10.</span> Sources</h2>
+        <ol class="sources">
+          <li id="s1">Robert C. Martin, "Screaming Architecture", 2011. <a href="https://blog.cleancoder.com/uncle-bob/2011/09/30/Screaming-Architecture.html">blog.cleancoder.com</a></li>
+          <li id="s2">Robert C. Martin, <em>Clean Architecture</em>, ch. 13 "Component Cohesion", 2017. <a href="https://www.oreilly.com/library/view/clean-architecture-a/9780134494272/">O'Reilly</a></li>
+          <li id="s3">Jimmy Bogard, "Vertical Slice Architecture", 2018. <a href="https://www.jimmybogard.com/vertical-slice-architecture/">jimmybogard.com</a></li>
+          <li id="s4">"Package by feature, not layer". <a href="http://www.javapractices.com/topic/TopicAction.do?Id=205">javapractices.com</a></li>
+          <li id="s5">Angular style guide. <a href="https://angular.dev/style-guide">angular.dev/style-guide</a></li>
+          <li id="s6">Nx, "Folder Structure". <a href="https://nx.dev/docs/concepts/decisions/folder-structure">nx.dev</a></li>
+          <li id="s7">Angular style guide, v17 (folders-by-feature, LIFT). <a href="https://v17.angular.io/guide/styleguide">v17.angular.io</a></li>
+          <li id="s8">Nx, "Project Size". <a href="https://nx.dev/concepts/decisions/project-size">nx.dev</a></li>
+          <li id="s9">Source trees: <a href="https://github.com/angular/components/tree/main/src/material">Angular Material</a>, <a href="https://github.com/primefaces/primeng">PrimeNG</a>, <a href="https://github.com/spartan-ng/spartan">Spartan</a>, <a href="https://github.com/taiga-family/taiga-ui">Taiga UI</a>, <a href="https://github.com/ReactiveX/rxjs/tree/7.x/src/internal">RxJS 7</a>.</li>
+          <li id="s10">Josh W. Comeau, "Delightful React File/Directory Structure". <a href="https://www.joshwcomeau.com/react/file-structure/">joshwcomeau.com</a></li>
+          <li id="s11">Anthropic, "Effective context engineering for AI agents", 2025. <a href="https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents">anthropic.com</a></li>
+          <li id="s12">arXiv 2604.13108, 2026 (preprint). <a href="https://arxiv.org/abs/2604.13108">arxiv.org</a></li>
+        </ol>
+        <p class="sources">Further reading: Kent C. Dodds, <a href="https://kentcdodds.com/blog/colocation">"Colocation"</a>; Manfred Steyer, <a href="https://www.angulararchitects.io/en/blog/modern-architectures-with-angular-part-1-strategic-design-with-sheriff-and-standalone-components/">strategic design with Sheriff and standalone components</a>; Nx, <a href="https://nx.dev/docs/concepts/decisions/project-dependency-rules">project dependency rules</a>.</p>
+      </section>
+    </main>
+
+    <footer class="footer" id="contact">
+      <h2 class="footer__title">More on the workspace</h2>
+      <p class="footer__sub">The full layout these rules live in, and the migration that produced it.</p>
+      <a class="btn btn--primary" href="/articles/nx-folder-structure/">The folder structure</a>
+      <a class="btn btn--ghost" href="/articles/">All writing</a>
+      <p class="footer__note mono">© 2026 Andrii Siuta · deployed on GitHub Pages</p>
+    </footer>
+  </div>
+</body>
+</html>
