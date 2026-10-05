@@ -1,0 +1,679 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Where does this file go? — Andrii Siuta</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="The folder structure of a 42-library Nx Angular workspace: two tags per library, feature libraries sliced by screen, data-access kept by kind, a thin app, and the checks that hold the shape.">
+  <meta property="og:title" content="Where does this file go? The folder structure of an Nx Angular workspace">
+  <meta property="og:description" content="The folder structure of a 42-library Nx Angular workspace: two tags per library, feature libraries sliced by screen, data-access kept by kind, a thin app, and the checks that hold the shape.">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://andriisiuta.github.io/articles/nx-folder-structure/">
+  <meta property="article:published_time" content="2026-10-05">
+  <meta property="article:author" content="Andrii Siuta">
+  <link rel="canonical" href="https://andriisiuta.github.io/articles/nx-folder-structure/">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚡</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #06060f;
+      --bg-card: #0d0d1c;
+      --bg-card-hover: #12122a;
+      --border: #1e1e3a;
+      --text: #d6d6e7;
+      --text-dim: #8a8aa3;
+      --heading: #f4f4fb;
+      --pink: #ff3e7f;
+      --violet: #a855f7;
+      --red: #f0060b;
+      --green: #3ddc97;
+      --gradient: linear-gradient(90deg, #f0060b 0%, #cc26d5 55%, #7702ff 100%);
+      --gradient-soft: linear-gradient(90deg, #ff3e7f 0%, #a855f7 100%);
+      --font-body: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+      --font-head: 'Space Grotesk', var(--font-body);
+      --font-mono: 'JetBrains Mono', ui-monospace, 'Fira Code', monospace;
+      color-scheme: dark;
+    }
+
+    * { box-sizing: border-box; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      margin: 0;
+      background:
+        radial-gradient(ellipse 60% 40% at 70% -10%, rgba(119, 2, 255, 0.14), transparent),
+        radial-gradient(ellipse 50% 35% at 20% 10%, rgba(255, 62, 127, 0.1), transparent),
+        var(--bg);
+      color: var(--text);
+      font-family: var(--font-body);
+      font-size: 16px;
+      line-height: 1.65;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    ::selection { background: rgba(255, 62, 127, 0.35); color: #fff; }
+
+    .mono { font-family: var(--font-mono); }
+    .accent { color: var(--pink); }
+
+    a { color: var(--pink); text-decoration: none; }
+    a:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+    .nav {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px max(16px, calc(50vw - 506px));
+      backdrop-filter: blur(12px);
+      background: rgba(6, 6, 15, 0.7);
+      border-bottom: 1px solid rgba(30, 30, 58, 0.6);
+    }
+
+    .nav__brand { font-family: var(--font-head); font-weight: 700; font-size: 1.4rem; color: var(--heading); }
+    .nav__brand:hover { text-decoration: none; }
+    .nav__links { display: flex; gap: 22px; }
+    .nav__links a { color: var(--text-dim); font-size: 0.9rem; transition: color 0.2s; }
+    .nav__links a:hover { color: var(--pink); text-decoration: none; }
+
+    .wrap { max-width: 1060px; margin: 0 auto; padding: 0 16px; }
+    .article { max-width: 760px; margin: 0 auto; }
+
+    .hero { position: relative; padding: 80px 0 40px; }
+    .hero__glow { position: absolute; border-radius: 50%; filter: blur(90px); pointer-events: none; }
+    .hero__glow--pink { width: 380px; height: 380px; top: -60px; right: -80px; background: rgba(255, 62, 127, 0.16); }
+    .hero__glow--violet { width: 300px; height: 300px; bottom: -40px; left: -100px; background: rgba(119, 2, 255, 0.16); }
+    .hero__eyebrow { color: var(--pink); font-size: 0.95rem; margin: 0 0 14px; }
+    .cursor { animation: blink 1.1s step-end infinite; }
+    @keyframes blink { 50% { opacity: 0; } }
+
+    .hero__title {
+      font-family: var(--font-head);
+      font-size: clamp(2rem, 5.2vw, 3.4rem);
+      font-weight: 700;
+      line-height: 1.08;
+      margin: 0 0 20px;
+      background: var(--gradient);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      filter: drop-shadow(0 0 24px rgba(204, 38, 213, 0.25));
+    }
+
+    .hero__dek { color: var(--text-dim); font-size: 1.12rem; line-height: 1.6; margin: 0 0 26px; max-width: 700px; }
+    .hero__meta { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; color: var(--text-dim); font-size: 0.85rem; }
+
+    .chip {
+      font-family: var(--font-mono);
+      font-size: 0.74rem;
+      color: var(--text);
+      background: rgba(168, 85, 247, 0.1);
+      border: 1px solid rgba(168, 85, 247, 0.3);
+      border-radius: 999px;
+      padding: 3px 11px;
+    }
+
+    .metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin: 30px 0 10px; }
+
+    .metric {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 18px 14px;
+      text-align: center;
+      transition: border-color 0.25s, transform 0.25s;
+    }
+
+    .metric:hover { border-color: rgba(255, 62, 127, 0.5); transform: translateY(-3px); }
+
+    .metric__value {
+      display: block;
+      font-family: var(--font-head);
+      font-size: 1.55rem;
+      font-weight: 700;
+      line-height: 1.15;
+      letter-spacing: -0.01em;
+      background: var(--gradient-soft);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      white-space: nowrap;
+    }
+
+    .metric__label { display: block; color: var(--text-dim); font-size: 0.8rem; margin-top: 6px; }
+
+    .toc { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 20px 24px; margin: 36px 0 10px; }
+    .toc__title { font-family: var(--font-mono); font-size: 0.78rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.08em; margin: 0 0 12px; }
+    .toc ol { margin: 0; padding: 0; list-style: none; columns: 2; column-gap: 28px; }
+    .toc li { margin: 0 0 7px; break-inside: avoid; font-size: 0.93rem; }
+    .toc li a { color: var(--text); }
+    .toc li a:hover { color: var(--pink); text-decoration: none; }
+    .toc .n { font-family: var(--font-mono); color: var(--pink); font-size: 0.8rem; margin-right: 8px; }
+
+    .section { padding: 54px 0 4px; }
+
+    .section__title {
+      font-family: var(--font-head);
+      font-size: 1.65rem;
+      color: var(--heading);
+      margin: 0 0 24px;
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+      line-height: 1.25;
+    }
+
+    .section__title::after { content: ''; flex: 1; height: 1px; min-width: 24px; background: linear-gradient(90deg, var(--border), transparent); }
+    .section__title .num { font-family: var(--font-mono); color: var(--pink); font-size: 1rem; flex-shrink: 0; }
+
+    h3 { font-family: var(--font-head); color: var(--heading); font-size: 1.15rem; margin: 34px 0 12px; }
+
+    p { margin: 0 0 16px; }
+    .article ul, .article ol { margin: 0 0 18px; padding-left: 22px; }
+    .article li { margin-bottom: 7px; }
+    .article li::marker { color: var(--pink); }
+    strong { color: var(--heading); font-weight: 600; }
+
+    code {
+      font-family: var(--font-mono);
+      font-size: 0.86em;
+      background: rgba(168, 85, 247, 0.1);
+      border: 1px solid rgba(168, 85, 247, 0.22);
+      border-radius: 5px;
+      padding: 1px 6px;
+      color: var(--text);
+      word-break: break-word;
+    }
+
+    pre {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 18px 20px;
+      margin: 0 0 20px;
+      overflow-x: auto;
+      font-size: 0.82rem;
+      line-height: 1.6;
+    }
+
+    pre code { background: none; border: 0; padding: 0; font-size: inherit; color: var(--text); word-break: normal; }
+
+    .pre__label { display: block; font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-dim); margin: 0 0 10px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+
+    .c { color: var(--text-dim); }
+    .s { color: var(--pink); }
+    .k { color: var(--violet); }
+
+    .pull {
+      margin: 28px 0;
+      padding: 6px 0 6px 22px;
+      border-left: 3px solid transparent;
+      border-image: var(--gradient-soft) 1;
+      font-family: var(--font-head);
+      font-size: 1.2rem;
+      line-height: 1.45;
+      color: var(--heading);
+    }
+
+    .pull p { margin: 0; }
+
+    .note { border: 1px solid var(--border); border-left: 3px solid var(--violet); border-radius: 10px; padding: 14px 18px; background: var(--bg-card); margin: 0 0 20px; font-size: 0.95rem; }
+    .note p:last-child { margin: 0; }
+    .note__tag { display: inline-block; font-family: var(--font-mono); font-size: 0.72rem; color: var(--violet); border: 1px solid rgba(168, 85, 247, 0.5); border-radius: 999px; padding: 2px 9px; margin-bottom: 8px; }
+    .note--pink { border-left-color: var(--pink); }
+    .note--pink .note__tag { color: var(--pink); border-color: rgba(255, 62, 127, 0.5); }
+    .note--green { border-left-color: var(--green); }
+    .note--green .note__tag { color: var(--green); border-color: rgba(61, 220, 151, 0.5); }
+
+    .table-wrap { overflow-x: auto; margin: 0 0 22px; border: 1px solid var(--border); border-radius: 12px; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.9rem; min-width: 480px; }
+    th, td { padding: 10px 14px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--border); }
+    th { font-family: var(--font-mono); font-weight: 600; font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-dim); background: var(--bg-card); }
+    tr:last-child td { border-bottom: 0; }
+    tbody tr:hover td { background: rgba(168, 85, 247, 0.05); }
+    td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    td:first-child code { white-space: nowrap; }
+
+    figure { margin: 26px 0 24px; }
+    figure svg { display: block; width: 100%; max-width: 100%; height: auto; }
+    figure svg text { font-family: var(--font-mono); }
+    figcaption { color: var(--text-dim); font-size: 0.86rem; margin-top: 12px; line-height: 1.5; }
+
+    .footer { text-align: center; padding: 80px 0 50px; }
+    .footer__title { font-family: var(--font-head); font-size: clamp(1.4rem, 4vw, 2rem); color: var(--heading); margin: 0 0 12px; }
+    .footer__sub { color: var(--text-dim); max-width: 520px; margin: 0 auto 26px; }
+
+    .btn { display: inline-block; padding: 12px 26px; border-radius: 8px; font-weight: 600; font-size: 0.95rem; transition: transform 0.2s, box-shadow 0.2s; }
+    .btn:hover { text-decoration: none; transform: translateY(-2px); }
+    .btn--primary { background: var(--gradient-soft); color: #fff; box-shadow: 0 0 24px rgba(255, 62, 127, 0.35); }
+    .btn--primary:hover { box-shadow: 0 0 36px rgba(168, 85, 247, 0.5); }
+    .btn--ghost { border: 1px solid var(--border); color: var(--text); margin-left: 10px; }
+    .btn--ghost:hover { border-color: var(--pink); color: var(--pink); }
+    .footer__note { margin-top: 40px; color: var(--text-dim); font-size: 0.75rem; opacity: 0.7; }
+
+    @media (max-width: 640px) {
+      .hero { padding-top: 56px; }
+      .nav__links { gap: 14px; }
+      .nav__links a { font-size: 0.8rem; }
+      .metrics { grid-template-columns: repeat(2, 1fr); }
+      .metric__value { font-size: 1.3rem; }
+      .toc ol { columns: 1; }
+      figure { overflow-x: auto; }
+      figure svg { min-width: 640px; }
+      .pull { font-size: 1.05rem; }
+      .btn--ghost { margin-left: 0; margin-top: 10px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      .cursor { animation: none; }
+      .metric, .btn { transition: none; }
+    }
+    .tree { font-family: var(--font-mono); font-size: 0.82rem; line-height: 1.55; }
+    .tree .d { color: var(--violet); }
+    .tree .f { color: var(--text); }
+    .tree .x { color: var(--text-dim); }
+    .two { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .two pre { margin: 0 0 20px; }
+    @media (max-width: 640px) { .two { grid-template-columns: 1fr; } }
+  </style>
+<body>
+  <nav class="nav">
+    <a class="nav__brand" href="/">AS<span class="accent">.</span></a>
+    <div class="nav__links">
+      <a href="/">CV</a>
+      <a href="/articles/">Writing</a>
+      <a href="https://github.com/AndriiSiuta" target="_blank" rel="noopener">GitHub</a>
+      <a href="https://www.linkedin.com/in/andrii-siuta/" target="_blank" rel="noopener">LinkedIn</a>
+    </div>
+  </nav>
+
+  <div class="wrap">
+    <header class="hero">
+      <div class="hero__glow hero__glow--pink"></div>
+      <div class="hero__glow hero__glow--violet"></div>
+      <p class="hero__eyebrow mono">$ tree libs -L 2<span class="cursor">▊</span></p>
+      <h1 class="hero__title">Where does this file go?</h1>
+      <p class="hero__dek">The folder structure we ended up with after moving an enterprise Angular app to Nx: two tags name every library, feature libraries are sliced by screen, data-access libraries keep their technical folders, and the app holds almost nothing. This is the reference guide that goes with the migration case study: the shape, the reasons, and the questions a developer (or an agent) asks before creating a file.</p>
+      <div class="hero__meta">
+        <span>Andrii Siuta</span>
+        <span>·</span>
+        <span>October 2026</span>
+        <span>·</span>
+        <span>~12 min read</span>
+        <span class="chip">Angular</span>
+        <span class="chip">Nx</span>
+        <span class="chip">architecture</span>
+      </div>
+      <div class="metrics">
+        <div class="metric"><span class="metric__value">42</span><span class="metric__label">libraries</span></div>
+        <div class="metric"><span class="metric__value">9 × 6</span><span class="metric__label">scopes × types</span></div>
+        <div class="metric"><span class="metric__value">0</span><span class="metric__label">code folders in the app</span></div>
+        <div class="metric"><span class="metric__value">1</span><span class="metric__label">way to import a library</span></div>
+        <div class="metric"><span class="metric__value">0</span><span class="metric__label">technical folders on top of a feature library</span></div>
+        <div class="metric"><span class="metric__value">0</span><span class="metric__label">ignored cycles</span></div>
+      </div>
+      <nav class="toc" aria-label="Contents">
+        <p class="toc__title">Contents</p>
+        <ol>
+          <li><a href="#map"><span class="n">01</span>The map</a></li>
+          <li><a href="#tags"><span class="n">02</span>Two tags name every library</a></li>
+          <li><a href="#app"><span class="n">03</span>The app holds almost nothing</a></li>
+          <li><a href="#feature"><span class="n">04</span>Feature libraries: sliced by screen</a></li>
+          <li><a href="#slice"><span class="n">05</span>Inside a slice</a></li>
+          <li><a href="#data-access"><span class="n">06</span>Data-access: organised by kind</a></li>
+          <li><a href="#others"><span class="n">07</span>ui, util, testing, shell</a></li>
+          <li><a href="#decide"><span class="n">08</span>Where does it go? A decision guide</a></li>
+          <li><a href="#imports"><span class="n">09</span>Imports and barrels</a></li>
+          <li><a href="#guards"><span class="n">10</span>What holds the shape</a></li>
+          <li><a href="#advice"><span class="n">11</span>If you are starting one</a></li>
+        </ol>
+      </nav>
+    </header>
+
+    <main class="article">
+      <section class="section" id="map">
+        <h2 class="section__title"><span class="num">01.</span> The map</h2>
+        <p>
+          The workspace has one application and forty-two libraries in nine scopes. A scope is a business
+          domain, plus two technical ones: <code>shared</code> for what no domain owns, and <code>shell</code>
+          for the frame that loads everything else. Every library lives exactly two folders deep.
+        </p>
+<pre class="tree"><span class="pre__label">the workspace, top two levels (domain names are placeholders)</span><code><span class="d">apps/</span>
+  <span class="d">portal/</span>               <span class="x">the one app: bootstrap, config, global styles, assets</span>
+<span class="d">libs/</span>
+  <span class="d">shell/</span>
+    <span class="d">feature/</span>            <span class="x">root routes, guards, interceptors, layout</span>
+  <span class="d">shared/</span>
+    <span class="d">data-access/</span>        <span class="x">HTTP layer, feature flags, runtime config</span>
+    <span class="d">ui/</span>                 <span class="x">design-system wrappers, generic components, shared Sass partials</span>
+    <span class="d">util/</span>               <span class="x">domain-free models and pure helpers</span>
+    <span class="d">testing/</span>            <span class="x">generic generators and fixtures, for specs only</span>
+  <span class="d">orders/</span>
+    <span class="d">feature/</span>            <span class="x">the routed screens of the domain</span>
+    <span class="d">ui/</span>                 <span class="x">what another domain renders</span>
+    <span class="d">data-access/</span>        <span class="x">entity models, the domain's API class, its store</span>
+    <span class="d">testing/</span>            <span class="x">the domain's generators</span>
+  <span class="d">catalog/</span>
+    <span class="d">products-feature/</span>   <span class="x">a big domain gets one feature library per area</span>
+    <span class="d">pricing-feature/</span>
+    <span class="d">data-access/</span>
+    …
+<span class="d">tools/</span>                  <span class="x">build scripts and the workspace-shape specs</span></code></pre>
+        <p>
+          The path, the project name and the import alias all come from the same two words:
+          <code>libs/orders/data-access</code> is the project <code>orders-data-access</code> and is imported as
+          <code>@org/orders/data-access</code>. Nobody has to look a name up.
+        </p>
+      </section>
+
+      <section class="section" id="tags">
+        <h2 class="section__title"><span class="num">02.</span> Two tags name every library</h2>
+        <p>
+          Each library carries a <code>scope:</code> tag (which domain) and a <code>type:</code> tag (which layer).
+          The scope says who owns it; the type says what it may contain and what it may import. The
+          dependency rule is a table over the type, checked by the Nx module-boundaries lint rule:
+        </p>
+        <figure>
+          <svg viewBox="0 0 760 316" role="img" aria-labelledby="layers-t layers-d">
+            <title id="layers-t">The layer order</title>
+            <desc id="layers-d">Six layers from top to bottom: app, shell, feature, ui, data-access, util. Arrows only point down. Testing sits on the side and is reached from spec files only.</desc>
+            <defs>
+              <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#a855f7"/></marker>
+            </defs>
+            <g font-size="13" fill="#d6d6e7">
+              <rect x="40" y="10" width="460" height="34" rx="8" fill="#0d0d1c" stroke="#1e1e3a"/>
+              <text x="60" y="32">app</text><text x="200" y="32" fill="#8a8aa3">bootstrap only · may import anything</text>
+              <rect x="40" y="58" width="460" height="34" rx="8" fill="#0d0d1c" stroke="#ff3e7f"/>
+              <text x="60" y="80">shell</text><text x="200" y="80" fill="#8a8aa3">the only layer that loads features</text>
+              <rect x="40" y="106" width="460" height="34" rx="8" fill="#0d0d1c" stroke="#ff3e7f"/>
+              <text x="60" y="128">feature</text><text x="200" y="128" fill="#8a8aa3">never imports another feature</text>
+              <rect x="40" y="154" width="460" height="34" rx="8" fill="#0d0d1c" stroke="#1e1e3a"/>
+              <text x="60" y="176">ui</text><text x="200" y="176" fill="#8a8aa3">components another domain renders</text>
+              <rect x="40" y="202" width="460" height="34" rx="8" fill="#0d0d1c" stroke="#1e1e3a"/>
+              <text x="60" y="224">data-access</text><text x="200" y="224" fill="#8a8aa3">models, API classes, stores</text>
+              <rect x="40" y="250" width="460" height="34" rx="8" fill="#0d0d1c" stroke="#1e1e3a"/>
+              <text x="60" y="272">util</text><text x="200" y="272" fill="#8a8aa3">pure helpers, no domain</text>
+              <path d="M525 30 L525 262" stroke="#a855f7" stroke-width="2" marker-end="url(#ar)"/>
+              <text x="537" y="110" fill="#a855f7">imports point down</text>
+              <rect x="600" y="154" width="130" height="82" rx="8" fill="#0d0d1c" stroke="#3ddc97" stroke-dasharray="5 4"/>
+              <text x="616" y="180">testing</text>
+              <text x="616" y="202" fill="#8a8aa3" font-size="11">from *.spec.ts</text>
+              <text x="616" y="220" fill="#8a8aa3" font-size="11">files only</text>
+              <text x="40" y="308" fill="#8a8aa3" font-size="11">pink border = scope-private: no other scope may import it</text>
+            </g>
+          </svg>
+          <figcaption>The six types. A library may import its own layer and anything below it, never above. Only <code>feature</code> and <code>shell</code> libraries are private to their scope; everything else is reachable from any domain.</figcaption>
+        </figure>
+        <p>Today the census is 13 feature, 10 ui, 11 data-access, 6 testing, 1 util and 1 shell library. Two consequences of the table carry most of the structure:</p>
+        <ul>
+          <li><strong>A feature never imports another feature.</strong> When a screen in one domain needs something from another domain, the thing it needs moves down into that domain's <code>ui</code> or <code>data-access</code> library. Features become leaves, and a leaf can be lazy-loaded, tested and deleted on its own.</li>
+          <li><strong><code>shared</code> imports only <code>shared</code>.</strong> The day a shared library imports a domain it is no longer shared. Domain models stay home, in the domain's <code>data-access</code>, and other domains import them from there.</li>
+        </ul>
+        <div class="note note--pink">
+          <span class="note__tag">challenge</span>
+          <p>Our first table made every scope private: a domain could reach only itself and <code>shared</code>. Anything two domains needed had to be lifted into <code>shared</code>, which grew to a quarter of all library code and made almost every test suite "affected" by any change.</p>
+        </div>
+        <div class="note note--green">
+          <span class="note__tag">how we solved it</span>
+          <p>Only <code>feature</code> and <code>shell</code> stay private. Every other type is open to every scope, and the type rows alone stop a feature from leaking. Models moved back to their domains, one API class per domain replaced a 24-method façade, and the cross-domain data edges became a short, one-way list.</p>
+        </div>
+      </section>
+
+      <section class="section" id="app">
+        <h2 class="section__title"><span class="num">03.</span> The app holds almost nothing</h2>
+        <p>
+          The application's <code>src/</code> is flat: the bootstrap file, the root component, authentication
+          configuration, global styles with the design tokens, translation files, assets and environment
+          files. It has no <code>app/</code> folder and no code folder of any kind.
+        </p>
+        <p>
+          That is deliberate. An app folder is the one place the boundaries rule cannot help with: the app
+          may import anything, so anything put there is code nobody can reuse and nobody can fence. The
+          rule we work by is short:
+        </p>
+        <blockquote class="pull"><p>A new domain is a library, never a folder in the app.</p></blockquote>
+        <p>
+          Libraries never import the app either. A library that needs the environment or runtime
+          configuration reads it through an injection token that the bootstrap file provides, so the
+          library compiles and tests without the app existing at all.
+        </p>
+      </section>
+
+      <section class="section" id="feature">
+        <h2 class="section__title"><span class="num">04.</span> Feature libraries: sliced by screen</h2>
+        <p>
+          A feature library is the routed screens of one domain or one area of it. It is lazy-loaded from
+          the shell's root routes and is never imported statically. Its top level answers one question:
+          <em>which screens are in here?</em>
+        </p>
+        <div class="two">
+<pre class="tree"><span class="pre__label">before: sorted by kind</span><code><span class="d">src/lib/</span>
+  <span class="d">components/</span>
+  <span class="d">services/</span>
+  <span class="d">models/</span>
+  <span class="d">resolvers/</span>
+  <span class="d">utils/</span>
+  <span class="f">orders.routes.ts</span>
+<span class="x">which screens exist?
+open every folder to find out</span></code></pre>
+<pre class="tree"><span class="pre__label">after: sliced by screen</span><code><span class="d">src/lib/</span>
+  <span class="f">orders.routes.ts</span>
+  <span class="d">order-list/</span>
+  <span class="d">order-details/</span>
+  <span class="d">order-edit/</span>
+  <span class="d">cancel-order-dialog/</span>  <span class="x">← shared thing</span>
+  <span class="f">orders.service.ts</span>     <span class="x">← two slices</span>
+  <span class="f">order-view.model.ts</span></code></pre>
+        </div>
+        <p>The top level of a feature library may contain only four kinds of entry:</p>
+        <ul>
+          <li><strong>The routes file</strong>, which also exports the domain's providers array (more on that below).</li>
+          <li><strong>A slice</strong>: one folder per screen or use case, named for what the user does there.</li>
+          <li><strong>A flat file two slices share</strong>: a feature service, a resolver, a view model.</li>
+          <li><strong>A folder named for a shared thing</strong>: a dialog that three screens open, a history panel two screens render. It is named for the thing, never for its kind.</li>
+        </ul>
+        <p>
+          What may not appear is a technical folder (<code>components</code>, <code>services</code>,
+          <code>models</code>, <code>resolvers</code>, <code>guards</code>, <code>utils</code>, <code>dialogs</code>,
+          <code>pipes</code> and so on) or a Feature-Sliced Design segment (<code>entities</code>,
+          <code>model</code>, <code>api</code>, <code>lib</code> and so on). A spec fails the build if one
+          shows up.
+        </p>
+        <h3>Providers live with the routes</h3>
+        <p>
+          There are no NgModules. Each lazy domain's routes file exports its routes and an
+          <code>&lt;domain&gt;Providers</code> array, registered on a component-less root route. That gives one
+          injector per lazy-load site, which is what the old feature module gave. A domain service is listed
+          there rather than provided in root, so it lives and dies with its screens. The exceptions are few
+          and named: a service a root-level dialog injects, the cross-domain API classes, and the genuinely
+          app-wide shared services.
+        </p>
+      </section>
+
+      <section class="section" id="slice">
+        <h2 class="section__title"><span class="num">05.</span> Inside a slice</h2>
+<pre class="tree"><span class="pre__label">one slice</span><code><span class="d">order-details/</span>
+  <span class="f">order-details.component.*</span>              <span class="x">the routed component, flat</span>
+  <span class="f">order-details.resolver.ts</span>              <span class="x">only this slice reads it</span>
+  <span class="f">order-details.model.ts</span>
+  <span class="d">order-timeline/</span>                        <span class="x">a sub-component keeps its folder</span>
+  <span class="d">ui/</span>                                    <span class="x">small dumb components may share one</span>
+    <span class="d">status-badge/</span>
+    <span class="d">price-line/</span></code></pre>
+        <ul>
+          <li>The routed component's files sit flat at the slice root.</li>
+          <li>The resolver, guard, service, model or helper that only this slice reads sits flat beside it.</li>
+          <li>A sub-component keeps its own folder inside the slice.</li>
+          <li>When something gets a second reader in another slice, it moves up to the library root, flat or in a folder named for it.</li>
+          <li>When something gets a reader in another <em>domain</em>, it moves out of the feature library altogether, into the domain's <code>ui</code> or <code>data-access</code>.</li>
+          <li>A service's interfaces live in a sibling <code>*.model.ts</code>, never inside the service file.</li>
+        </ul>
+        <p>
+          The rule of thumb is that a file lives as close to its readers as possible and moves exactly one
+          level when it gets a new kind of reader. A spec checks the upward direction too: a file at the
+          library root whose importers all sit in one slice fails, because it belongs in that slice.
+        </p>
+      </section>
+
+      <section class="section" id="data-access">
+        <h2 class="section__title"><span class="num">06.</span> Data-access: organised by kind</h2>
+        <p>
+          Slicing by screen is right for features and wrong for the data layer. A data-access library
+          holds what other code injects or types against: entity models, the domain's API class, its store.
+          A service layer really is organised by kind, so the technical folders stay, and they are a
+          closed list:
+        </p>
+<pre class="tree"><span class="pre__label">a data-access library</span><code><span class="d">src/lib/</span>
+  <span class="d">models/</span>     <span class="x">one file per entity</span>
+  <span class="d">services/</span>   <span class="x">the domain's API class, held-state services</span>
+  <span class="d">store/</span>      <span class="x">state, actions, selectors, the store facade</span>
+  <span class="d">consts/</span>
+  <span class="d">utils/</span></code></pre>
+        <div class="note note--pink">
+          <span class="note__tag">challenge</span>
+          <p>One wave put a domain's store inside its feature library, because only that feature read it. It looked tidy. The day a second screen in another library needed the same state, the store would have had to move under deadline pressure.</p>
+        </div>
+        <div class="note note--green">
+          <span class="note__tag">how we solved it</span>
+          <p>A store lives in the domain's data-access library whatever the consumer count. The feature's routes file registers it through the library's alias. Any class whose job is held state follows the same rule. It removes a judgement call, and the cost is one import line.</p>
+        </div>
+        <p>
+          This is stricter than some published guidance, which keeps a one-consumer store inside the
+          feature. Both satisfy the same layer order; for a team, a rule without a "how many readers?"
+          question is easier to follow and to check.
+        </p>
+      </section>
+
+      <section class="section" id="others">
+        <h2 class="section__title"><span class="num">07.</span> ui, util, testing, shell</h2>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Type</th><th>Holds</th><th>Top level of <code>src/lib</code></th></tr></thead>
+            <tbody>
+              <tr><td><code>ui</code></td><td>components another domain renders, including a routeless widget</td><td>one folder per component; shared Sass partials in a <code>styles/</code> folder at the library root</td></tr>
+              <tr><td><code>util</code></td><td>domain-free models and pure helpers</td><td>technical folders and flat files</td></tr>
+              <tr><td><code>testing</code></td><td>a scope's test generators and fixtures</td><td>anything; imported by spec files only</td></tr>
+              <tr><td><code>shell</code></td><td>root routes, guards, interceptors, layout</td><td>technical folders: <code>components/ services/ guards/ interceptors/</code></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>Three rules here are worth calling out because each one came from a failure:</p>
+        <ul>
+          <li><strong>A widget with no route is never a feature.</strong> If another domain renders it, it is <code>ui</code> plus <code>data-access</code>. A feature library that another domain imports breaks lazy loading and the boundaries at the same time.</li>
+          <li><strong>Generators are their own library, not a <code>testing/</code> folder.</strong> Nx counts a spec's import as a dependency. A generator folder inside a production library dragged fixtures into its production graph; a separate <code>type:testing</code> library, reachable only from spec files, does not.</li>
+          <li><strong>A shared Sass partial lives in a ui library's <code>styles/</code> folder</strong> and is reached by a load-path import, never by <code>../../..</code>. The project graph cannot see Sass imports, so a spec checks them instead.</li>
+        </ul>
+      </section>
+
+      <section class="section" id="decide">
+        <h2 class="section__title"><span class="num">08.</span> Where does it go? A decision guide</h2>
+        <p>
+          This is the table we actually use, both in code review and in the instructions our AI agents
+          read before creating a file. Start from the first row that matches.
+        </p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>You are adding…</th><th>It goes in</th></tr></thead>
+            <tbody>
+              <tr><td>a new business domain</td><td>a new scope: <code>libs/&lt;domain&gt;/feature</code> plus <code>data-access</code>, never a folder in the app</td></tr>
+              <tr><td>a new routed screen</td><td>a new slice in the domain's feature library, plus a route in its routes file</td></tr>
+              <tr><td>a component only that screen uses</td><td>a sub-folder inside the slice</td></tr>
+              <tr><td>a component another domain renders</td><td>the domain's <code>ui</code> library</td></tr>
+              <tr><td>a service for one screen</td><td>flat in the slice, listed in the domain's providers array</td></tr>
+              <tr><td>a service two screens of the same feature share</td><td>flat at the feature library root</td></tr>
+              <tr><td>an entity model, or an HTTP API call</td><td>the domain's <code>data-access</code>: <code>models/</code> or <code>services/</code></td></tr>
+              <tr><td>a store, or any service that holds state</td><td>the domain's <code>data-access</code>, <code>store/</code> or <code>services/</code></td></tr>
+              <tr><td>a type that names two domains</td><td>the downstream domain's <code>data-access</code>: the one that already depends on the other</td></tr>
+              <tr><td>a pure helper with no domain</td><td><code>shared/util</code></td></tr>
+              <tr><td>a test generator</td><td>the scope's <code>testing</code> library</td></tr>
+              <tr><td>a guard or interceptor for the whole app</td><td>the shell</td></tr>
+              <tr><td>a Sass partial two libraries use</td><td><code>styles/</code> in the owning <code>ui</code> library</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>
+          The row about a type that names two domains is how cycles are prevented without an exception
+          list. There are four such patterns, short enough to remember: layers point down only; a testing
+          library depends on its domain's data-access and never the reverse; a type naming two domains lives
+          downstream; and two features that need each other's screens share a <code>ui</code> library, never
+          each other.
+        </p>
+      </section>
+
+      <section class="section" id="imports">
+        <h2 class="section__title"><span class="num">09.</span> Imports and barrels</h2>
+        <ul>
+          <li><strong>Between libraries, only the alias.</strong> <code>@org/&lt;scope&gt;/&lt;name&gt;</code>, never a path into another library's <code>src</code>, not even inside a test mock string.</li>
+          <li><strong>Inside a library, only relative paths.</strong> A library never imports itself through its own alias.</li>
+          <li><strong>A barrel exports only what another project imports.</strong> A feature library's barrel exports its routes and nothing else. A data-access barrel exports the models, API classes and store pieces other libraries use. The barrel is the library's public API, so it stays small on purpose.</li>
+        </ul>
+        <p>
+          Small barrels matter more than they look. Everything exported is something another library
+          can start to depend on, and every dependency is an edge that <code>nx affected</code> has to follow.
+          A narrow public API keeps the affected set narrow, which keeps CI fast.
+        </p>
+      </section>
+
+      <section class="section" id="guards">
+        <h2 class="section__title"><span class="num">10.</span> What holds the shape</h2>
+        <p>
+          None of this survives on documentation alone, especially with AI agents writing a large share of
+          the code. Each rule above is held by something that fails:
+        </p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Check</th><th>Fails when</th></tr></thead>
+            <tbody>
+              <tr><td>Boundaries lint, required in the PR pipeline</td><td>an import crosses the layer table, forms a cycle, imports the app, statically imports a lazy library, or reaches a testing library from production code</td></tr>
+              <tr><td>Library-shape spec, one row per library</td><td>a feature library grows a technical folder; a data-access library grows a folder outside its list; <code>shared</code> imports a domain; a root file has readers in one slice only; the library count drops below its floor</td></tr>
+              <tr><td>Provider census spec</td><td>an injectable with no <code>providedIn</code> is listed in no providers array</td></tr>
+              <tr><td>Sass-edge spec</td><td>a stylesheet import reaches into the app or into a feature library</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>
+          The rules a spec cannot check (slice names, a file in the wrong slice, a technical folder nested
+          inside a slice) are checked on review. Any structural rule we add has to name the check that would
+          fail if it were broken, or say plainly that none exists.
+        </p>
+        <p>
+          The library-count floor deserves a note. A check with a fixed number breaks the day someone
+          legitimately deletes a library. A floor that only ever moves up catches the deletion that was
+          not legitimate.
+        </p>
+      </section>
+
+      <section class="section" id="advice">
+        <h2 class="section__title"><span class="num">11.</span> If you are starting one</h2>
+        <ul>
+          <li><strong>Pick the types before the scopes.</strong> The type table is the architecture; the scopes are just the domains you already have.</li>
+          <li><strong>Make only feature and shell libraries private to their scope.</strong> A private data layer pushes every shared model into <code>shared</code>, and <code>shared</code> becomes the monolith you were leaving.</li>
+          <li><strong>Slice features by screen; keep the data layer by kind.</strong> The two layers answer different questions, so they get different shapes.</li>
+          <li><strong>Keep the app empty.</strong> If the app has a code folder, someone will put a domain in it.</li>
+          <li><strong>Write the "where does it go" table down</strong> and give it to people and agents alike. Most structural drift is somebody who did not know which row applied.</li>
+          <li><strong>Back every rule with a check.</strong> A layout described only in a document lasts about one busy sprint.</li>
+        </ul>
+        <blockquote class="pull"><p>A good folder structure answers "where does this go?" before anyone asks it.</p></blockquote>
+        <p>
+          The story of how we got here (twelve days, ten pull requests, the rules we reversed and the
+          numbers) is in the <a href="/articles/nx-migration/">migration case study</a>.
+        </p>
+      </section>
+    </main>
+
+    <footer class="footer" id="contact">
+      <h2 class="footer__title">The migration behind it</h2>
+      <p class="footer__sub">How an 18-folder Angular app became this workspace, one pull request per phase.</p>
+      <a class="btn btn--primary" href="/articles/nx-migration/">The case study</a>
+      <a class="btn btn--ghost" href="/articles/">All writing</a>
+      <p class="footer__note mono">© 2026 Andrii Siuta · deployed on GitHub Pages</p>
+    </footer>
+  </div>
+</body>
+</html>
