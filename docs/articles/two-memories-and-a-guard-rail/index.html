@@ -1,0 +1,551 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Two memories and a guard rail — Andrii Siuta</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Two days putting memory and guard rails around Claude Code on a production Angular monorepo: claude-mem with its guardrails, the tether hooks finally firing, and a harness score that moved from 38 to 45 of 50.">
+  <meta property="og:title" content="Two memories and a guard rail">
+  <meta property="og:description" content="Two days putting memory and guard rails around Claude Code on a production Angular monorepo: claude-mem with its guardrails, the tether hooks finally firing, and a harness score that moved from 38 to 45 of 50.">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://andriisiuta.github.io/articles/two-memories-and-a-guard-rail/">
+  <meta property="og:site_name" content="Andrii Siuta">
+  <meta property="og:image" content="https://andriisiuta.github.io/articles/two-memories-and-a-guard-rail/og.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Two memories and a guard rail">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Two memories and a guard rail">
+  <meta name="twitter:description" content="Two days putting memory and guard rails around Claude Code on a production Angular monorepo: claude-mem with its guardrails, the tether hooks finally firing, and a harness score that moved from 38 to 45 of 50.">
+  <meta name="twitter:image" content="https://andriisiuta.github.io/articles/two-memories-and-a-guard-rail/og.png">
+  <meta property="article:published_time" content="2026-10-11">
+  <meta property="article:author" content="Andrii Siuta">
+  <link rel="canonical" href="https://andriisiuta.github.io/articles/two-memories-and-a-guard-rail/">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚡</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #06060f;
+      --bg-card: #0d0d1c;
+      --bg-card-hover: #12122a;
+      --border: #1e1e3a;
+      --text: #d6d6e7;
+      --text-dim: #8a8aa3;
+      --heading: #f4f4fb;
+      --pink: #ff3e7f;
+      --violet: #a855f7;
+      --red: #f0060b;
+      --green: #3ddc97;
+      --gradient: linear-gradient(90deg, #f0060b 0%, #cc26d5 55%, #7702ff 100%);
+      --gradient-soft: linear-gradient(90deg, #ff3e7f 0%, #a855f7 100%);
+      --font-body: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+      --font-head: 'Space Grotesk', var(--font-body);
+      --font-mono: 'JetBrains Mono', ui-monospace, 'Fira Code', monospace;
+      color-scheme: dark;
+    }
+
+    * { box-sizing: border-box; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      margin: 0;
+      background:
+        radial-gradient(ellipse 60% 40% at 70% -10%, rgba(119, 2, 255, 0.14), transparent),
+        radial-gradient(ellipse 50% 35% at 20% 10%, rgba(255, 62, 127, 0.1), transparent),
+        var(--bg);
+      color: var(--text);
+      font-family: var(--font-body);
+      font-size: 16px;
+      line-height: 1.65;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    ::selection { background: rgba(255, 62, 127, 0.35); color: #fff; }
+
+    .mono { font-family: var(--font-mono); }
+    .accent { color: var(--pink); }
+
+    a { color: var(--pink); text-decoration: none; }
+    a:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+    .nav {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px max(16px, calc(50vw - 506px));
+      backdrop-filter: blur(12px);
+      background: rgba(6, 6, 15, 0.7);
+      border-bottom: 1px solid rgba(30, 30, 58, 0.6);
+    }
+
+    .nav__brand { font-family: var(--font-head); font-weight: 700; font-size: 1.4rem; color: var(--heading); }
+    .nav__brand:hover { text-decoration: none; }
+    .nav__links { display: flex; gap: 22px; }
+    .nav__links a { color: var(--text-dim); font-size: 0.9rem; transition: color 0.2s; }
+    .nav__links a:hover { color: var(--pink); text-decoration: none; }
+
+    .wrap { max-width: 1060px; margin: 0 auto; padding: 0 16px; }
+    .article { max-width: 760px; margin: 0 auto; }
+
+    .hero { position: relative; padding: 80px 0 40px; }
+    .hero__glow { position: absolute; border-radius: 50%; filter: blur(90px); pointer-events: none; }
+    .hero__glow--pink { width: 380px; height: 380px; top: -60px; right: -80px; background: rgba(255, 62, 127, 0.16); }
+    .hero__glow--violet { width: 300px; height: 300px; bottom: -40px; left: -100px; background: rgba(119, 2, 255, 0.16); }
+    .hero__eyebrow { color: var(--pink); font-size: 0.95rem; margin: 0 0 14px; }
+    .cursor { animation: blink 1.1s step-end infinite; }
+    @keyframes blink { 50% { opacity: 0; } }
+
+    .hero__title {
+      font-family: var(--font-head);
+      font-size: clamp(2rem, 5.2vw, 3.4rem);
+      font-weight: 700;
+      line-height: 1.08;
+      margin: 0 0 20px;
+      background: var(--gradient);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      filter: drop-shadow(0 0 24px rgba(204, 38, 213, 0.25));
+    }
+
+    .hero__dek { color: var(--text-dim); font-size: 1.12rem; line-height: 1.6; margin: 0 0 26px; max-width: 700px; }
+    .hero__meta { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; color: var(--text-dim); font-size: 0.85rem; }
+
+    .chip {
+      font-family: var(--font-mono);
+      font-size: 0.74rem;
+      color: var(--text);
+      background: rgba(168, 85, 247, 0.1);
+      border: 1px solid rgba(168, 85, 247, 0.3);
+      border-radius: 999px;
+      padding: 3px 11px;
+    }
+
+    .metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin: 30px 0 10px; }
+
+    .metric {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 18px 14px;
+      text-align: center;
+      transition: border-color 0.25s, transform 0.25s;
+    }
+
+    .metric:hover { border-color: rgba(255, 62, 127, 0.5); transform: translateY(-3px); }
+
+    .metric__value {
+      display: block;
+      font-family: var(--font-head);
+      font-size: 1.55rem;
+      font-weight: 700;
+      line-height: 1.15;
+      letter-spacing: -0.01em;
+      background: var(--gradient-soft);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      white-space: nowrap;
+    }
+
+    .metric__label { display: block; color: var(--text-dim); font-size: 0.8rem; margin-top: 6px; }
+
+    .toc { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 20px 24px; margin: 36px 0 10px; }
+    .toc__title { font-family: var(--font-mono); font-size: 0.78rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.08em; margin: 0 0 12px; }
+    .toc ol { margin: 0; padding: 0; list-style: none; columns: 2; column-gap: 28px; }
+    .toc li { margin: 0 0 7px; break-inside: avoid; font-size: 0.93rem; }
+    .toc li a { color: var(--text); }
+    .toc li a:hover { color: var(--pink); text-decoration: none; }
+    .toc .n { font-family: var(--font-mono); color: var(--pink); font-size: 0.8rem; margin-right: 8px; }
+
+    .section { padding: 54px 0 4px; }
+
+    .section__title {
+      font-family: var(--font-head);
+      font-size: 1.65rem;
+      color: var(--heading);
+      margin: 0 0 24px;
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+      line-height: 1.25;
+    }
+
+    .section__title::after { content: ''; flex: 1; height: 1px; min-width: 24px; background: linear-gradient(90deg, var(--border), transparent); }
+    .section__title .num { font-family: var(--font-mono); color: var(--pink); font-size: 1rem; flex-shrink: 0; }
+
+    h3 { font-family: var(--font-head); color: var(--heading); font-size: 1.15rem; margin: 34px 0 12px; }
+
+    p { margin: 0 0 16px; }
+    .article ul, .article ol { margin: 0 0 18px; padding-left: 22px; }
+    .article li { margin-bottom: 7px; }
+    .article li::marker { color: var(--pink); }
+    strong { color: var(--heading); font-weight: 600; }
+
+    code {
+      font-family: var(--font-mono);
+      font-size: 0.86em;
+      background: rgba(168, 85, 247, 0.1);
+      border: 1px solid rgba(168, 85, 247, 0.22);
+      border-radius: 5px;
+      padding: 1px 6px;
+      color: var(--text);
+      word-break: break-word;
+    }
+
+    pre {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 18px 20px;
+      margin: 0 0 20px;
+      overflow-x: auto;
+      font-size: 0.82rem;
+      line-height: 1.6;
+    }
+
+    pre code { background: none; border: 0; padding: 0; font-size: inherit; color: var(--text); word-break: normal; }
+
+    .pre__label { display: block; font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-dim); margin: 0 0 10px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+
+    .c { color: var(--text-dim); }
+    .s { color: var(--pink); }
+    .k { color: var(--violet); }
+
+    .pull {
+      margin: 28px 0;
+      padding: 6px 0 6px 22px;
+      border-left: 3px solid transparent;
+      border-image: var(--gradient-soft) 1;
+      font-family: var(--font-head);
+      font-size: 1.2rem;
+      line-height: 1.45;
+      color: var(--heading);
+    }
+
+    .pull p { margin: 0; }
+
+    .note { border: 1px solid var(--border); border-left: 3px solid var(--violet); border-radius: 10px; padding: 14px 18px; background: var(--bg-card); margin: 0 0 20px; font-size: 0.95rem; }
+    .note p:last-child { margin: 0; }
+    .note__tag { display: inline-block; font-family: var(--font-mono); font-size: 0.72rem; color: var(--violet); border: 1px solid rgba(168, 85, 247, 0.5); border-radius: 999px; padding: 2px 9px; margin-bottom: 8px; }
+    .note--pink { border-left-color: var(--pink); }
+    .note--pink .note__tag { color: var(--pink); border-color: rgba(255, 62, 127, 0.5); }
+    .note--green { border-left-color: var(--green); }
+    .note--green .note__tag { color: var(--green); border-color: rgba(61, 220, 151, 0.5); }
+
+    .table-wrap { overflow-x: auto; margin: 0 0 22px; border: 1px solid var(--border); border-radius: 12px; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.9rem; min-width: 480px; }
+    th, td { padding: 10px 14px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--border); }
+    th { font-family: var(--font-mono); font-weight: 600; font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-dim); background: var(--bg-card); }
+    tr:last-child td { border-bottom: 0; }
+    tbody tr:hover td { background: rgba(168, 85, 247, 0.05); }
+    td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    td:first-child code { white-space: nowrap; }
+
+    figure { margin: 26px 0 24px; }
+    figure svg { display: block; width: 100%; max-width: 100%; height: auto; }
+    figure svg text { font-family: var(--font-mono); }
+    figcaption { color: var(--text-dim); font-size: 0.86rem; margin-top: 12px; line-height: 1.5; }
+
+    .footer { text-align: center; padding: 80px 0 50px; }
+    .footer__title { font-family: var(--font-head); font-size: clamp(1.4rem, 4vw, 2rem); color: var(--heading); margin: 0 0 12px; }
+    .footer__sub { color: var(--text-dim); max-width: 520px; margin: 0 auto 26px; }
+
+    .btn { display: inline-block; padding: 12px 26px; border-radius: 8px; font-weight: 600; font-size: 0.95rem; transition: transform 0.2s, box-shadow 0.2s; }
+    .btn:hover { text-decoration: none; transform: translateY(-2px); }
+    .btn--primary { background: var(--gradient-soft); color: #fff; box-shadow: 0 0 24px rgba(255, 62, 127, 0.35); }
+    .btn--primary:hover { box-shadow: 0 0 36px rgba(168, 85, 247, 0.5); }
+    .btn--ghost { border: 1px solid var(--border); color: var(--text); margin-left: 10px; }
+    .btn--ghost:hover { border-color: var(--pink); color: var(--pink); }
+    .footer__note { margin-top: 40px; color: var(--text-dim); font-size: 0.75rem; opacity: 0.7; }
+
+    @media (max-width: 640px) {
+      .hero { padding-top: 56px; }
+      .nav__links { gap: 14px; }
+      .nav__links a { font-size: 0.8rem; }
+      .metrics { grid-template-columns: repeat(2, 1fr); }
+      .metric__value { font-size: 1.3rem; }
+      .toc ol { columns: 1; }
+      figure { overflow-x: auto; }
+      figure svg { min-width: 640px; }
+      .pull { font-size: 1.05rem; }
+      .btn--ghost { margin-left: 0; margin-top: 10px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      .cursor { animation: none; }
+      .metric, .btn { transition: none; }
+    }
+    .tree { font-family: var(--font-mono); font-size: 0.82rem; line-height: 1.55; }
+    .tree .d { color: var(--violet); }
+    .tree .f { color: var(--text); }
+    .tree .x { color: var(--text-dim); }
+    .two { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .two pre { margin: 0 0 20px; }
+    @media (max-width: 640px) { .two { grid-template-columns: 1fr; } }
+    .sources { font-size: 0.86rem; color: var(--text-dim); padding-left: 22px; }
+    .sources li { margin-bottom: 6px; word-break: break-word; }
+    sup a { font-family: var(--font-mono); font-size: 0.7rem; }
+  </style>
+</head>
+<body>
+  <nav class="nav">
+    <a class="nav__brand" href="/">AS<span class="accent">.</span></a>
+    <div class="nav__links">
+      <a href="/">CV</a>
+      <a href="/articles/">Writing</a>
+      <a href="https://github.com/AndriiSiuta" target="_blank" rel="noopener">GitHub</a>
+      <a href="https://www.linkedin.com/in/andrii-siuta/" target="_blank" rel="noopener">LinkedIn</a>
+    </div>
+  </nav>
+
+  <div class="wrap">
+    <header class="hero">
+      <div class="hero__glow hero__glow--pink"></div>
+      <div class="hero__glow hero__glow--violet"></div>
+      <p class="hero__eyebrow mono">$ claude plugin install tether@tether --scope local<span class="cursor">▊</span></p>
+      <h1 class="hero__title">Two memories and a guard rail</h1>
+      <p class="hero__dek">Two days putting memory and guard rails around Claude Code on a production Angular monorepo. <a href="https://github.com/thedotmack/claude-mem" target="_blank" rel="noopener">claude-mem</a> gave the sessions a memory nobody curates, with guardrails set before its first run. <a href="/articles/tether/">tether</a> gave them hooks that cannot be talked out of, once they were actually installed. And a scorecard out of 50 gave "is the harness good enough" an answer that moves.</p>
+      <div class="hero__meta">
+        <span>Andrii Siuta</span>
+        <span>·</span>
+        <span>October 2026</span>
+        <span>·</span>
+        <span>~8 min read</span>
+        <span class="chip">Claude Code</span>
+        <span class="chip">claude-mem</span>
+        <span class="chip">tether</span>
+      </div>
+      <div class="metrics">
+        <div class="metric"><span class="metric__value">38 → 45</span><span class="metric__label">harness score, of 50</span></div>
+        <div class="metric"><span class="metric__value">2</span><span class="metric__label">memories</span></div>
+        <div class="metric"><span class="metric__value">39</span><span class="metric__label">hooks in a session</span></div>
+        <div class="metric"><span class="metric__value">4</span><span class="metric__label">releases in two days</span></div>
+        <div class="metric"><span class="metric__value">5 / 5</span><span class="metric__label">eval cases passing</span></div>
+        <div class="metric"><span class="metric__value">251</span><span class="metric__label">tests</span></div>
+      </div>
+      <p>
+        <a class="btn btn--primary" href="https://github.com/AndriiSiuta/tether" target="_blank" rel="noopener">github.com/AndriiSiuta/tether</a>
+      </p>
+      <nav class="toc" aria-label="Contents">
+        <p class="toc__title">Contents</p>
+        <ol>
+          <li><a href="#start"><span class="n">01</span>Where we started</a></li>
+          <li><a href="#memories"><span class="n">02</span>Two memories</a></li>
+          <li><a href="#guards"><span class="n">03</span>Guard rails that do not trust the model</a></li>
+          <li><a href="#live"><span class="n">04</span>Getting the hooks live</a></li>
+          <li><a href="#score"><span class="n">05</span>The score</a></li>
+          <li><a href="#keep"><span class="n">06</span>What to keep</a></li>
+        </ol>
+      </nav>
+    </header>
+
+    <main class="article">
+      <section class="section" id="start">
+        <h2 class="section__title"><span class="num">01.</span> Where we started</h2>
+        <p>
+          On the morning of 10 October the harness around my Claude Code sessions had two gaps I did not know
+          about. The project-local hooks, Prettier after every edit, the implementer report check, the git guard,
+          lived in a <code>settings.local.proposed.json</code> that Claude Code never reads. No hook had run in
+          that repository for weeks. And memory was a single layer: a curated folder of Markdown facts, good for
+          rulings and pull-request state, blind to the tool-call history that produced them.
+        </p>
+        <p>
+          The goal for the day was to close both gaps with two plugins that already existed.
+          <a href="https://github.com/thedotmack/claude-mem" target="_blank" rel="noopener">claude-mem</a> adds a
+          searchable, automatically written history of what every session did.
+          <a href="/articles/tether/">tether</a>, my own plugin, carries project-neutral hooks that read every
+          project value from a <code>.claude/harness.json</code>. The second goal was to put a number on the harness
+          as a whole: a score out of 50, so that "is it good enough" has an answer that moves.
+        </p>
+        <blockquote class="pull"><p>A point is claimed when something runs and is seen to run, never when it is written.</p></blockquote>
+      </section>
+
+      <section class="section" id="memories">
+        <h2 class="section__title"><span class="num">02.</span> Two memories</h2>
+        <p>
+          claude-mem runs a second, smaller model beside every session. It watches the tool calls, writes short
+          observations into a local database, and injects a compact summary of recent work at the start of the
+          next session. The result is a memory nobody has to curate. The cost is that the observer is a model too:
+          billed to the same plan, invisible in <code>/cost</code>, and it sees everything the main session sees,
+          including file contents.
+        </p>
+        <p>I set the guardrails before the first run, in the global settings, so they apply in every repository:</p>
+        <ul>
+          <li><strong>No observations from subagents.</strong> A planning run dispatches a dozen agents; without this the observer re-reads every one of them.</li>
+          <li><strong>Skip the output of the verify script, nx and jest.</strong> Test logs are the longest and least useful thing to summarise.</li>
+          <li><strong>Redaction on</strong>, so a token that passes through a tool result never reaches the database.</li>
+          <li><strong>The file-read gate off, and the plugin's own telemetry off.</strong></li>
+        </ul>
+        <p>
+          Of the plugin's 22 skills I keep four in use: memory search, structural code exploration, the explainer,
+          and the agent cost report. The other 18 duplicate agents the harness already has, or send data out. The
+          lesson of the day was how to switch them off.
+        </p>
+        <div class="note note--pink">
+          <span class="note__tag">challenge</span>
+          <p>The <code>skillOverrides</code> setting looks right and does nothing: Claude Code documents that plugin skills are not affected by it. Eighteen entries, a reload, and all 22 skills still listed.</p>
+        </div>
+        <div class="note note--green">
+          <span class="note__tag">how we solved it</span>
+          <p>The switch is a sentence in the project's local instructions that names the four allowed skills and forbids the rest, with a per-skill permission deny as the harder option if that ever fails.</p>
+        </div>
+        <p>
+          The two memories now divide the work. The curated file memory keeps rulings, review bars and PR state,
+          written on purpose. claude-mem keeps the searchable history of what was tried, written by itself. The
+          investigator agent queries it once per ticket for earlier work on the same area, and treats what comes
+          back as data, like a ticket.
+        </p>
+      </section>
+
+      <section class="section" id="guards">
+        <h2 class="section__title"><span class="num">03.</span> Guard rails that do not trust the model</h2>
+        <p>
+          tether is the part of the harness that does not trust the model. Its hooks run as shell processes around
+          tool calls and read one file, <code>.claude/harness.json</code>:
+        </p>
+        <ul>
+          <li>A <strong>git guard</strong> blocks a commit or push on a protected branch, one that carries a local-only path, and a commit whose text carries a token shape.</li>
+          <li>A <strong>deny list</strong> blocks MCP tools that write where they should not: a design file, a wiki page.</li>
+          <li>A <strong>reminder</strong> lands on every result from an untrusted source, a ticket, a web page, a memory search, and once at session start.</li>
+          <li>An implementer's <strong>report</strong> must carry the fields a reviewer needs. A spec has a word cap. A fix loop has a round cap.</li>
+        </ul>
+        <p>Four releases went out across the two days, each on green CI:</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Version</th><th>Date</th><th>What changed</th></tr></thead>
+            <tbody>
+              <tr><td><code>0.4.2</code></td><td>11 Oct</td><td>The git guard judges only the executable text of a command; a repository's own <code>harness.json</code> governs it</td></tr>
+              <tr><td><code>0.4.1</code></td><td>10 Oct</td><td>The dashboard filters by the <code>vcs_repository_name</code> label the metrics carry</td></tr>
+              <tr><td><code>0.4.0</code></td><td>10 Oct</td><td>Nested <code>harness.json</code> lookup, secret-shape checks in both guards, a session-start reminder, a <code>setup --only harness</code> scaffold, eval fixes</td></tr>
+              <tr><td><code>0.3.0</code></td><td>10 Oct</td><td>claude-mem alignment: the eval runner disables memory capture, <code>setup --only claude-mem</code> writes the guardrails</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>
+          Two of those changes came from how the day went rather than from a plan. The nested lookup exists because
+          the frontend sits two folders below the git root and the old guard looked only at the root. The
+          secret-shape check exists because the guard already saw every commit command, so refusing one that
+          carries a GitHub, Anthropic, AWS or Azure DevOps token shape cost a dozen lines.
+        </p>
+      </section>
+
+      <section class="section" id="live">
+        <h2 class="section__title"><span class="num">04.</span> Getting the hooks live</h2>
+        <p>
+          Enabling the plugin was not enough. After writing <code>"tether@tether": true</code> into the project's
+          local settings, two reloads and a fresh config file, a probe commit against a local-only folder still went
+          through. Claude Code loads a plugin only when the project also has an install record for it, and mine
+          existed for two other directories. One command from the project fixed it:
+        </p>
+<pre><code>claude plugin install tether@tether --scope local</code></pre>
+        <p>
+          Then <code>/reload-plugins</code> reported 10 plugins and 39 hooks where there had been 9 and 31, and the
+          probe came back blocked: <em>the commit names a local-only harness path</em>. That was the last
+          provisional point on the scorecard.
+        </p>
+        <p>
+          The guard tripped within the hour. A Python heredoc that edited the day's notes mentioned the probe
+          command in a string, and the guard matched <code>git commit</code> anywhere in the Bash text. The next
+          morning the fix went in as 0.4.2. The guard now strips heredoc bodies and plain quoted strings before
+          deciding whether a command is a commit, but keeps a quoted string when it is the program of an
+          interpreter, so <code>bash -c "git commit …"</code> and <code>eval</code> are still judged. The path check
+          keeps quotes, so a quoted pathspec still blocks. The secret check still reads the whole text.
+        </p>
+        <p>
+          Shipping that fix needed a second change. The guard applied the frontend project's config to the plugin
+          repository, whose commits land on <code>main</code>, so the release commit would have been blocked from
+          the same session. A repository with its own <code>harness.json</code> is now governed by it, and falls
+          back to the session project's config only when it has none.
+        </p>
+      </section>
+
+      <section class="section" id="score">
+        <h2 class="section__title"><span class="num">05.</span> The score</h2>
+        <p>
+          The harness scores 45 of 50, up from 38 on the morning of 10 October. Ten areas, five points each,
+          scored on evidence.
+        </p>
+        <figure>
+          <svg viewBox="0 0 760 350" role="img" aria-labelledby="sc-t sc-d">
+            <title id="sc-t">Harness scorecard, ten areas, before and after</title>
+            <desc id="sc-d">Tests and CI 5 to 5. Docs 5 to 5. Guards 4 to 5. Untrusted input 4 to 5. Observability 4 to 5. Setup 4 to 5. Agents 4 to 4. Process controls 4 to 4. Evals 2 to 4. Adoption 2 to 3. Total 38 to 45 of 50.</desc>
+            <g font-size="12" fill="#d6d6e7">
+              <g stroke="#1e1e3a">
+                <line x1="200" y1="30" x2="200" y2="320"/><line x1="300" y1="30" x2="300" y2="320"/><line x1="400" y1="30" x2="400" y2="320"/><line x1="500" y1="30" x2="500" y2="320"/><line x1="600" y1="30" x2="600" y2="320"/><line x1="700" y1="30" x2="700" y2="320"/>
+              </g>
+              <g fill="#8a8aa3" text-anchor="middle" font-size="11">
+                <text x="200" y="20">0</text><text x="300" y="20">1</text><text x="400" y="20">2</text><text x="500" y="20">3</text><text x="600" y="20">4</text><text x="700" y="20">5</text>
+              </g>
+              <g text-anchor="end">
+                <text x="186" y="48">Tests and CI</text><text x="186" y="78">Docs</text><text x="186" y="108">Guards</text><text x="186" y="138">Untrusted input</text><text x="186" y="168">Observability</text><text x="186" y="198">Setup</text><text x="186" y="228">Agents</text><text x="186" y="258">Process controls</text><text x="186" y="288">Evals</text><text x="186" y="318">Adoption</text>
+              </g>
+              <g stroke="#ff3e7f" stroke-width="2" stroke-opacity="0.45">
+                <line x1="600" y1="104" x2="700" y2="104"/><line x1="600" y1="134" x2="700" y2="134"/><line x1="600" y1="164" x2="700" y2="164"/><line x1="600" y1="194" x2="700" y2="194"/><line x1="400" y1="284" x2="600" y2="284"/><line x1="400" y1="314" x2="500" y2="314"/>
+              </g>
+              <g fill="#8a8aa3">
+                <circle cx="700" cy="44" r="6"/><circle cx="700" cy="74" r="6"/><circle cx="600" cy="104" r="6"/><circle cx="600" cy="134" r="6"/><circle cx="600" cy="164" r="6"/><circle cx="600" cy="194" r="6"/><circle cx="600" cy="224" r="6"/><circle cx="600" cy="254" r="6"/><circle cx="400" cy="284" r="6"/><circle cx="400" cy="314" r="6"/>
+              </g>
+              <g fill="#ff3e7f">
+                <circle cx="700" cy="44" r="6"/><circle cx="700" cy="74" r="6"/><circle cx="700" cy="104" r="6"/><circle cx="700" cy="134" r="6"/><circle cx="700" cy="164" r="6"/><circle cx="700" cy="194" r="6"/><circle cx="600" cy="224" r="6"/><circle cx="600" cy="254" r="6"/><circle cx="600" cy="284" r="6"/><circle cx="500" cy="314" r="6"/>
+              </g>
+              <g fill="#d6d6e7">
+                <text x="614" y="228">4 of 5</text><text x="614" y="258">4 of 5</text><text x="614" y="288">4 of 5</text><text x="514" y="318">3 of 5</text>
+              </g>
+              <text x="200" y="344" fill="#8a8aa3" font-size="11">grey: 10 Oct morning, 38 of 50 · pink: now, 45 of 50</text>
+            </g>
+          </svg>
+          <figcaption>Scored by hand on 10 and 11 October 2026. Six areas at full marks; adoption the furthest from it.</figcaption>
+        </figure>
+        <p>
+          Guards and untrusted input got to five through the secret-shape checks and the session-start reminder.
+          Observability and setup got there through the dashboard's repository filter and the scaffold, both
+          confirmed by running them. Evals moved the most, from two to four, once all five cases passed for reasons
+          that hold. Adoption moved from two to three when the hooks were seen to fire in a live session.
+        </p>
+        <p>
+          The last five points are not cheap. Evals wants a case for tether's own hooks, which needs a git
+          repository as a fixture and Bash allowed inside the eval sandbox. Process controls wants a per-run cost
+          cap enforced by a Stop hook that reads the telemetry ledger. Adoption carries two of the five: one for
+          weeks of everyday use without a bypass, one for a second user. Agents stays at four until an agent's
+          behaviour is proven by an eval rather than by reading its prompt.
+        </p>
+      </section>
+
+      <section class="section" id="keep">
+        <h2 class="section__title"><span class="num">06.</span> What to keep</h2>
+        <p>What the two days taught, in the order it hurt:</p>
+        <ol>
+          <li><strong>A hook nobody has seen fire is not installed.</strong> Probe every guard with a command it must block, and read the block message, before claiming the point.</li>
+          <li><strong>Enabling a plugin and installing it are two different things.</strong> Without an install record for the project, <code>enabledPlugins</code> enables nothing, and a reload reports success.</li>
+          <li><strong><code>skillOverrides</code> does not reach plugin skills.</strong> The switch for a plugin skill you do not want is an instruction the model reads, or a permission deny.</li>
+          <li><strong>The eval runner never says where the fixture is.</strong> Stage it into the working directory with a scaffold script instead.</li>
+          <li><strong>A guard that greps the whole command text blocks the notes about itself.</strong> Judge the executable text, keep interpreter arguments, keep the stricter checks on the whole text.</li>
+          <li><strong>A session's project config must not govern a different repository.</strong> The repository's own policy wins; the project's applies only where there is none.</li>
+          <li><strong>Set the observer's guardrails before its first run.</strong> Subagent skipping and redaction are cheap on day one and expensive to retrofit after a month of unredacted logs.</li>
+        </ol>
+        <p>
+          Telemetry and evals, the two ways I know any of this is true, have their own article:
+          <a href="/articles/telemetry-and-evals/">Telemetry and evals: how we know the harness works</a>.
+        </p>
+        <blockquote class="pull"><p>Two memories so the agent remembers. One guard rail so it does not matter when it forgets.</p></blockquote>
+      </section>
+    </main>
+
+    <footer class="footer" id="contact">
+      <h2 class="footer__title">Use it, break it, tell me</h2>
+      <p class="footer__sub">tether is on GitHub with its changelog and both articles. If you install it, you are one of the missing points.</p>
+      <a class="btn btn--primary" href="https://github.com/AndriiSiuta/tether" target="_blank" rel="noopener">tether on GitHub</a>
+      <a class="btn btn--ghost" href="/articles/telemetry-and-evals/">Telemetry and evals</a>
+      <p class="footer__note mono">© 2026 Andrii Siuta · deployed on GitHub Pages</p>
+    </footer>
+  </div>
+</body>
+</html>

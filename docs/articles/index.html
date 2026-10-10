@@ -176,10 +176,10 @@
 
   <div class="wrap">
     <header class="hero">
-      <p class="hero__eyebrow mono">$ ls articles/ | wc -l → 9</p>
+      <p class="hero__eyebrow mono">$ ls articles/ | wc -l → 11</p>
       <h1 class="hero__title">Writing</h1>
       <p class="hero__sub">Case studies and short notes from production front-end work: Angular architecture, Nx monorepos, and running AI agents on real codebases.</p>
-      <nav class="jump" aria-label="Groups"><a href="#case-studies">Case studies <span class="count">3</span></a><a href="#agents">Working with agents <span class="count">3</span></a><a href="#context">Context and decisions <span class="count">3</span></a></nav>
+      <nav class="jump" aria-label="Groups"><a href="#case-studies">Case studies <span class="count">3</span></a><a href="#agents">Working with agents <span class="count">5</span></a><a href="#context">Context and decisions <span class="count">3</span></a></nav>
     </header>
 
     <main>
@@ -236,9 +236,23 @@
       <section class="group" id="agents">
         <header class="group__head">
           <h2 class="group__title">Working with agents</h2>
-          <p class="group__blurb">Short notes on running parallel AI agents safely and cheaply.</p>
+          <p class="group__blurb">Notes on running AI agents safely, cheaply and with evidence.</p>
         </header>
         <div class="grid">
+          <a class="post post--featured" href="/articles/two-memories-and-a-guard-rail/">
+            <p class="post__meta mono"><span class="post__tag">Case study</span><span>~8 min</span></p>
+            <h3 class="post__title">Two memories and a guard rail</h3>
+            <p class="post__blurb">claude-mem with guardrails, tether hooks that finally fired, and a harness score out of 50 that moved from 38 to 45 in two days.</p>
+            <div class="chips"><span class="chip">Claude Code</span><span class="chip">claude-mem</span><span class="chip">tether</span></div>
+            <span class="post__more mono">Read →</span>
+          </a>
+          <a class="post post--featured" href="/articles/telemetry-and-evals/">
+            <p class="post__meta mono"><span class="post__tag">Guide</span><span>~9 min</span></p>
+            <h3 class="post__title">Telemetry and evals: how we know the harness works</h3>
+            <p class="post__blurb">One OpenTelemetry container on localhost, a seven-panel dashboard, two kinds of eval, and what the first full run taught about fixtures and the runner.</p>
+            <div class="chips"><span class="chip">Claude Code</span><span class="chip">OpenTelemetry</span><span class="chip">evals</span></div>
+            <span class="post__more mono">Read →</span>
+          </a>
           <a class="post" href="/articles/agent-worktrees/">
             <p class="post__meta mono"><span class="post__tag">Short read</span><span>~5 min</span></p>
             <h3 class="post__title">One agent, one worktree</h3>

@@ -1,0 +1,557 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Telemetry and evals: how we know the harness works — Andrii Siuta</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="How tether turns a harness of claims into evidence: one local OpenTelemetry container with a seven-panel dashboard, two kinds of eval, and what the first full eval run taught about fixtures and the runner.">
+  <meta property="og:title" content="Telemetry and evals: how we know the harness works">
+  <meta property="og:description" content="How tether turns a harness of claims into evidence: one local OpenTelemetry container with a seven-panel dashboard, two kinds of eval, and what the first full eval run taught about fixtures and the runner.">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://andriisiuta.github.io/articles/telemetry-and-evals/">
+  <meta property="og:site_name" content="Andrii Siuta">
+  <meta property="og:image" content="https://andriisiuta.github.io/articles/telemetry-and-evals/og.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Telemetry and evals: how we know the harness works">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Telemetry and evals: how we know the harness works">
+  <meta name="twitter:description" content="How tether turns a harness of claims into evidence: one local OpenTelemetry container with a seven-panel dashboard, two kinds of eval, and what the first full eval run taught about fixtures and the runner.">
+  <meta name="twitter:image" content="https://andriisiuta.github.io/articles/telemetry-and-evals/og.png">
+  <meta property="article:published_time" content="2026-10-11">
+  <meta property="article:author" content="Andrii Siuta">
+  <link rel="canonical" href="https://andriisiuta.github.io/articles/telemetry-and-evals/">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚡</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #06060f;
+      --bg-card: #0d0d1c;
+      --bg-card-hover: #12122a;
+      --border: #1e1e3a;
+      --text: #d6d6e7;
+      --text-dim: #8a8aa3;
+      --heading: #f4f4fb;
+      --pink: #ff3e7f;
+      --violet: #a855f7;
+      --red: #f0060b;
+      --green: #3ddc97;
+      --gradient: linear-gradient(90deg, #f0060b 0%, #cc26d5 55%, #7702ff 100%);
+      --gradient-soft: linear-gradient(90deg, #ff3e7f 0%, #a855f7 100%);
+      --font-body: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+      --font-head: 'Space Grotesk', var(--font-body);
+      --font-mono: 'JetBrains Mono', ui-monospace, 'Fira Code', monospace;
+      color-scheme: dark;
+    }
+
+    * { box-sizing: border-box; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      margin: 0;
+      background:
+        radial-gradient(ellipse 60% 40% at 70% -10%, rgba(119, 2, 255, 0.14), transparent),
+        radial-gradient(ellipse 50% 35% at 20% 10%, rgba(255, 62, 127, 0.1), transparent),
+        var(--bg);
+      color: var(--text);
+      font-family: var(--font-body);
+      font-size: 16px;
+      line-height: 1.65;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    ::selection { background: rgba(255, 62, 127, 0.35); color: #fff; }
+
+    .mono { font-family: var(--font-mono); }
+    .accent { color: var(--pink); }
+
+    a { color: var(--pink); text-decoration: none; }
+    a:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+    .nav {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px max(16px, calc(50vw - 506px));
+      backdrop-filter: blur(12px);
+      background: rgba(6, 6, 15, 0.7);
+      border-bottom: 1px solid rgba(30, 30, 58, 0.6);
+    }
+
+    .nav__brand { font-family: var(--font-head); font-weight: 700; font-size: 1.4rem; color: var(--heading); }
+    .nav__brand:hover { text-decoration: none; }
+    .nav__links { display: flex; gap: 22px; }
+    .nav__links a { color: var(--text-dim); font-size: 0.9rem; transition: color 0.2s; }
+    .nav__links a:hover { color: var(--pink); text-decoration: none; }
+
+    .wrap { max-width: 1060px; margin: 0 auto; padding: 0 16px; }
+    .article { max-width: 760px; margin: 0 auto; }
+
+    .hero { position: relative; padding: 80px 0 40px; }
+    .hero__glow { position: absolute; border-radius: 50%; filter: blur(90px); pointer-events: none; }
+    .hero__glow--pink { width: 380px; height: 380px; top: -60px; right: -80px; background: rgba(255, 62, 127, 0.16); }
+    .hero__glow--violet { width: 300px; height: 300px; bottom: -40px; left: -100px; background: rgba(119, 2, 255, 0.16); }
+    .hero__eyebrow { color: var(--pink); font-size: 0.95rem; margin: 0 0 14px; }
+    .cursor { animation: blink 1.1s step-end infinite; }
+    @keyframes blink { 50% { opacity: 0; } }
+
+    .hero__title {
+      font-family: var(--font-head);
+      font-size: clamp(2rem, 5.2vw, 3.4rem);
+      font-weight: 700;
+      line-height: 1.08;
+      margin: 0 0 20px;
+      background: var(--gradient);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      filter: drop-shadow(0 0 24px rgba(204, 38, 213, 0.25));
+    }
+
+    .hero__dek { color: var(--text-dim); font-size: 1.12rem; line-height: 1.6; margin: 0 0 26px; max-width: 700px; }
+    .hero__meta { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; color: var(--text-dim); font-size: 0.85rem; }
+
+    .chip {
+      font-family: var(--font-mono);
+      font-size: 0.74rem;
+      color: var(--text);
+      background: rgba(168, 85, 247, 0.1);
+      border: 1px solid rgba(168, 85, 247, 0.3);
+      border-radius: 999px;
+      padding: 3px 11px;
+    }
+
+    .metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin: 30px 0 10px; }
+
+    .metric {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 18px 14px;
+      text-align: center;
+      transition: border-color 0.25s, transform 0.25s;
+    }
+
+    .metric:hover { border-color: rgba(255, 62, 127, 0.5); transform: translateY(-3px); }
+
+    .metric__value {
+      display: block;
+      font-family: var(--font-head);
+      font-size: 1.55rem;
+      font-weight: 700;
+      line-height: 1.15;
+      letter-spacing: -0.01em;
+      background: var(--gradient-soft);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      white-space: nowrap;
+    }
+
+    .metric__label { display: block; color: var(--text-dim); font-size: 0.8rem; margin-top: 6px; }
+
+    .toc { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 20px 24px; margin: 36px 0 10px; }
+    .toc__title { font-family: var(--font-mono); font-size: 0.78rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.08em; margin: 0 0 12px; }
+    .toc ol { margin: 0; padding: 0; list-style: none; columns: 2; column-gap: 28px; }
+    .toc li { margin: 0 0 7px; break-inside: avoid; font-size: 0.93rem; }
+    .toc li a { color: var(--text); }
+    .toc li a:hover { color: var(--pink); text-decoration: none; }
+    .toc .n { font-family: var(--font-mono); color: var(--pink); font-size: 0.8rem; margin-right: 8px; }
+
+    .section { padding: 54px 0 4px; }
+
+    .section__title {
+      font-family: var(--font-head);
+      font-size: 1.65rem;
+      color: var(--heading);
+      margin: 0 0 24px;
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+      line-height: 1.25;
+    }
+
+    .section__title::after { content: ''; flex: 1; height: 1px; min-width: 24px; background: linear-gradient(90deg, var(--border), transparent); }
+    .section__title .num { font-family: var(--font-mono); color: var(--pink); font-size: 1rem; flex-shrink: 0; }
+
+    h3 { font-family: var(--font-head); color: var(--heading); font-size: 1.15rem; margin: 34px 0 12px; }
+
+    p { margin: 0 0 16px; }
+    .article ul, .article ol { margin: 0 0 18px; padding-left: 22px; }
+    .article li { margin-bottom: 7px; }
+    .article li::marker { color: var(--pink); }
+    strong { color: var(--heading); font-weight: 600; }
+
+    code {
+      font-family: var(--font-mono);
+      font-size: 0.86em;
+      background: rgba(168, 85, 247, 0.1);
+      border: 1px solid rgba(168, 85, 247, 0.22);
+      border-radius: 5px;
+      padding: 1px 6px;
+      color: var(--text);
+      word-break: break-word;
+    }
+
+    pre {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 18px 20px;
+      margin: 0 0 20px;
+      overflow-x: auto;
+      font-size: 0.82rem;
+      line-height: 1.6;
+    }
+
+    pre code { background: none; border: 0; padding: 0; font-size: inherit; color: var(--text); word-break: normal; }
+
+    .pre__label { display: block; font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-dim); margin: 0 0 10px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+
+    .c { color: var(--text-dim); }
+    .s { color: var(--pink); }
+    .k { color: var(--violet); }
+
+    .pull {
+      margin: 28px 0;
+      padding: 6px 0 6px 22px;
+      border-left: 3px solid transparent;
+      border-image: var(--gradient-soft) 1;
+      font-family: var(--font-head);
+      font-size: 1.2rem;
+      line-height: 1.45;
+      color: var(--heading);
+    }
+
+    .pull p { margin: 0; }
+
+    .note { border: 1px solid var(--border); border-left: 3px solid var(--violet); border-radius: 10px; padding: 14px 18px; background: var(--bg-card); margin: 0 0 20px; font-size: 0.95rem; }
+    .note p:last-child { margin: 0; }
+    .note__tag { display: inline-block; font-family: var(--font-mono); font-size: 0.72rem; color: var(--violet); border: 1px solid rgba(168, 85, 247, 0.5); border-radius: 999px; padding: 2px 9px; margin-bottom: 8px; }
+    .note--pink { border-left-color: var(--pink); }
+    .note--pink .note__tag { color: var(--pink); border-color: rgba(255, 62, 127, 0.5); }
+    .note--green { border-left-color: var(--green); }
+    .note--green .note__tag { color: var(--green); border-color: rgba(61, 220, 151, 0.5); }
+
+    .table-wrap { overflow-x: auto; margin: 0 0 22px; border: 1px solid var(--border); border-radius: 12px; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.9rem; min-width: 480px; }
+    th, td { padding: 10px 14px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--border); }
+    th { font-family: var(--font-mono); font-weight: 600; font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-dim); background: var(--bg-card); }
+    tr:last-child td { border-bottom: 0; }
+    tbody tr:hover td { background: rgba(168, 85, 247, 0.05); }
+    td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    td:first-child code { white-space: nowrap; }
+
+    figure { margin: 26px 0 24px; }
+    figure svg { display: block; width: 100%; max-width: 100%; height: auto; }
+    figure svg text { font-family: var(--font-mono); }
+    figcaption { color: var(--text-dim); font-size: 0.86rem; margin-top: 12px; line-height: 1.5; }
+
+    .footer { text-align: center; padding: 80px 0 50px; }
+    .footer__title { font-family: var(--font-head); font-size: clamp(1.4rem, 4vw, 2rem); color: var(--heading); margin: 0 0 12px; }
+    .footer__sub { color: var(--text-dim); max-width: 520px; margin: 0 auto 26px; }
+
+    .btn { display: inline-block; padding: 12px 26px; border-radius: 8px; font-weight: 600; font-size: 0.95rem; transition: transform 0.2s, box-shadow 0.2s; }
+    .btn:hover { text-decoration: none; transform: translateY(-2px); }
+    .btn--primary { background: var(--gradient-soft); color: #fff; box-shadow: 0 0 24px rgba(255, 62, 127, 0.35); }
+    .btn--primary:hover { box-shadow: 0 0 36px rgba(168, 85, 247, 0.5); }
+    .btn--ghost { border: 1px solid var(--border); color: var(--text); margin-left: 10px; }
+    .btn--ghost:hover { border-color: var(--pink); color: var(--pink); }
+    .footer__note { margin-top: 40px; color: var(--text-dim); font-size: 0.75rem; opacity: 0.7; }
+
+    @media (max-width: 640px) {
+      .hero { padding-top: 56px; }
+      .nav__links { gap: 14px; }
+      .nav__links a { font-size: 0.8rem; }
+      .metrics { grid-template-columns: repeat(2, 1fr); }
+      .metric__value { font-size: 1.3rem; }
+      .toc ol { columns: 1; }
+      figure { overflow-x: auto; }
+      figure svg { min-width: 640px; }
+      .pull { font-size: 1.05rem; }
+      .btn--ghost { margin-left: 0; margin-top: 10px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      .cursor { animation: none; }
+      .metric, .btn { transition: none; }
+    }
+    .tree { font-family: var(--font-mono); font-size: 0.82rem; line-height: 1.55; }
+    .tree .d { color: var(--violet); }
+    .tree .f { color: var(--text); }
+    .tree .x { color: var(--text-dim); }
+    .two { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .two pre { margin: 0 0 20px; }
+    @media (max-width: 640px) { .two { grid-template-columns: 1fr; } }
+    .sources { font-size: 0.86rem; color: var(--text-dim); padding-left: 22px; }
+    .sources li { margin-bottom: 6px; word-break: break-word; }
+    sup a { font-family: var(--font-mono); font-size: 0.7rem; }
+  </style>
+</head>
+<body>
+  <nav class="nav">
+    <a class="nav__brand" href="/">AS<span class="accent">.</span></a>
+    <div class="nav__links">
+      <a href="/">CV</a>
+      <a href="/articles/">Writing</a>
+      <a href="https://github.com/AndriiSiuta" target="_blank" rel="noopener">GitHub</a>
+      <a href="https://www.linkedin.com/in/andrii-siuta/" target="_blank" rel="noopener">LinkedIn</a>
+    </div>
+  </nav>
+
+  <div class="wrap">
+    <header class="hero">
+      <div class="hero__glow hero__glow--pink"></div>
+      <div class="hero__glow hero__glow--violet"></div>
+      <p class="hero__eyebrow mono">$ /tether:telemetry up<span class="cursor">▊</span></p>
+      <h1 class="hero__title">Telemetry and evals: how we know the harness works</h1>
+      <p class="hero__dek">A harness for Claude Code is a pile of claims. Telemetry shows what every session actually did and cost; evals run an agent against a frozen case and grade the result. This is how <a href="/articles/tether/">tether</a> does both: one container on localhost, a dashboard that splits cost by repository, frozen tasks against your own repository, five cases against the plugin, and the two lessons the first full run taught.</p>
+      <div class="hero__meta">
+        <span>Andrii Siuta</span>
+        <span>·</span>
+        <span>October 2026</span>
+        <span>·</span>
+        <span>~9 min read</span>
+        <span class="chip">Claude Code</span>
+        <span class="chip">OpenTelemetry</span>
+        <span class="chip">evals</span>
+      </div>
+      <div class="metrics">
+        <div class="metric"><span class="metric__value">1</span><span class="metric__label">container, on localhost</span></div>
+        <div class="metric"><span class="metric__value">14 days</span><span class="metric__label">retention</span></div>
+        <div class="metric"><span class="metric__value">7</span><span class="metric__label">dashboard panels</span></div>
+        <div class="metric"><span class="metric__value">2</span><span class="metric__label">kinds of eval</span></div>
+        <div class="metric"><span class="metric__value">5 / 5</span><span class="metric__label">cases passing</span></div>
+        <div class="metric"><span class="metric__value">≈ $7</span><span class="metric__label">for a day of eval runs</span></div>
+      </div>
+      <p>
+        <a class="btn btn--primary" href="https://github.com/AndriiSiuta/tether" target="_blank" rel="noopener">github.com/AndriiSiuta/tether</a>
+      </p>
+      <nav class="toc" aria-label="Contents">
+        <p class="toc__title">Contents</p>
+        <ol>
+          <li><a href="#claims"><span class="n">01</span>Claims and evidence</a></li>
+          <li><a href="#stack"><span class="n">02</span>One container, on localhost</a></li>
+          <li><a href="#dashboard"><span class="n">03</span>The dashboard</a></li>
+          <li><a href="#tasks"><span class="n">04</span>Frozen tasks against your repository</a></li>
+          <li><a href="#cases"><span class="n">05</span>Cases against the plugin</a></li>
+          <li><a href="#taught"><span class="n">06</span>What the evals taught</a></li>
+          <li><a href="#score"><span class="n">07</span>Where this leaves the score</a></li>
+        </ol>
+      </nav>
+    </header>
+
+    <main class="article">
+      <section class="section" id="claims">
+        <h2 class="section__title"><span class="num">01.</span> Claims and evidence</h2>
+        <p>
+          A harness for Claude Code is a pile of claims. The guard blocks bad commits. The planner writes tasks a
+          reviewer can read. The reviewer catches the import rule. Each claim is cheap to write and expensive to
+          believe. Two things turn claims into evidence: telemetry, which shows what every session actually did and
+          cost, and evals, which run an agent against a frozen case and grade the result. This is how
+          <a href="/articles/tether/">tether</a> does both, and what I learned setting them up.
+        </p>
+        <blockquote class="pull"><p>A rules file is a request. Telemetry is a receipt. An eval is a test.</p></blockquote>
+      </section>
+
+      <section class="section" id="stack">
+        <h2 class="section__title"><span class="num">02.</span> One container, on localhost</h2>
+        <p>
+          Claude Code can export OpenTelemetry metrics, logs and traces. tether's telemetry part points them at one
+          local container, <code>grafana/otel-lgtm</code>, pinned by digest and bound to <code>127.0.0.1</code>.
+          Nothing leaves the machine, and everything is kept for 14 days.
+        </p>
+        <figure>
+          <svg viewBox="0 0 760 250" role="img" aria-labelledby="tf-t tf-d">
+            <title id="tf-t">Where the telemetry flows</title>
+            <desc id="tf-d">A Claude Code session with its hooks exports over OTLP gRPC on port 4317 to one otel-lgtm container holding Prometheus, Loki and Tempo. Grafana on port 3000 reads it for the dashboard. The ledger command and the eval runner read the same store.</desc>
+            <defs><marker id="tf-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#a855f7"/></marker></defs>
+            <g font-size="13" fill="#d6d6e7">
+              <rect x="20" y="80" width="190" height="70" rx="10" fill="#0d0d1c" stroke="#a855f7"/>
+              <text x="115" y="108" text-anchor="middle">Claude Code session</text>
+              <text x="115" y="130" text-anchor="middle" fill="#8a8aa3" font-size="10">agents, hooks, subagents</text>
+              <path d="M210 115 L280 115" stroke="#a855f7" stroke-width="2" marker-end="url(#tf-a)"/>
+              <text x="247" y="98" text-anchor="middle" fill="#8a8aa3" font-size="10">OTLP gRPC</text>
+              <text x="247" y="138" text-anchor="middle" fill="#8a8aa3" font-size="9">127.0.0.1:4317</text>
+              <rect x="285" y="60" width="220" height="110" rx="10" fill="#0d0d1c" stroke="#ff3e7f"/>
+              <text x="395" y="88" text-anchor="middle" fill="#ff3e7f">otel-lgtm, one container</text>
+              <text x="395" y="112" text-anchor="middle" font-size="12">Prometheus · Loki · Tempo</text>
+              <text x="395" y="134" text-anchor="middle" fill="#8a8aa3" font-size="10">14 days of retention</text>
+              <text x="395" y="154" text-anchor="middle" fill="#8a8aa3" font-size="10">pinned by digest, no outbound</text>
+              <path d="M495 90 L570 50" stroke="#a855f7" stroke-width="2" marker-end="url(#tf-a)"/>
+              <path d="M495 115 L570 115" stroke="#a855f7" stroke-width="2" marker-end="url(#tf-a)"/>
+              <path d="M495 140 L570 180" stroke="#a855f7" stroke-width="2" marker-end="url(#tf-a)"/>
+              <rect x="575" y="25" width="165" height="50" rx="10" fill="#0d0d1c" stroke="#3ddc97"/>
+              <text x="657" y="47" text-anchor="middle" fill="#3ddc97">Grafana :3000</text>
+              <text x="657" y="65" text-anchor="middle" fill="#8a8aa3" font-size="10">seven panels, one filter</text>
+              <rect x="575" y="90" width="165" height="50" rx="10" fill="#0d0d1c" stroke="#1e1e3a"/>
+              <text x="657" y="112" text-anchor="middle">/tether:ledger</text>
+              <text x="657" y="130" text-anchor="middle" fill="#8a8aa3" font-size="10">fills a report's ledger</text>
+              <rect x="575" y="155" width="165" height="50" rx="10" fill="#0d0d1c" stroke="#1e1e3a"/>
+              <text x="657" y="177" text-anchor="middle">eval runner</text>
+              <text x="657" y="195" text-anchor="middle" fill="#8a8aa3" font-size="10">tokens and wall time</text>
+              <text x="20" y="236" fill="#8a8aa3" font-size="10">prompts, responses, tool content and raw API bodies never leave; tool names and Bash command text do</text>
+            </g>
+          </svg>
+          <figcaption>Every port is bound to localhost. The only consumers are the dashboard, the ledger command and the eval runner.</figcaption>
+        </figure>
+        <p>
+          <code>/tether:setup --only telemetry</code> writes the environment Claude Code needs: the OTLP exporters
+          over gRPC to port 4317, tool details on so the Bash command text and MCP tool names of every call land in
+          Loki, and prompts, responses, tool content and raw API bodies all off.
+          <code>/tether:telemetry up</code> starts the stack, after asking once before it pulls the image.
+        </p>
+      </section>
+
+      <section class="section" id="dashboard">
+        <h2 class="section__title"><span class="num">03.</span> The dashboard</h2>
+        <p>The Grafana dashboard, "Tether: Claude Code", has seven panels:</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Panel</th><th>What it answers</th></tr></thead>
+            <tbody>
+              <tr><td>Tokens by agent and model</td><td>Which agents eat the budget, and on which model</td></tr>
+              <tr><td>Cost by agent and model</td><td>The same in dollars</td></tr>
+              <tr><td>Tool failures by tool</td><td>Which tool calls fail, and how often</td></tr>
+              <tr><td>Tool decision rejects by source</td><td>What the permission layer and the hooks refused</td></tr>
+              <tr><td>Auto gate denied</td><td>What the auto-mode classifier stopped</td></tr>
+              <tr><td>MCP connection errors</td><td>Which servers are flaky</td></tr>
+              <tr><td>Session traces</td><td>One row per session, to find the one you mean</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>
+          A <code>Repository</code> variable splits the token and cost panels by repository. It reads the
+          <code>vcs_repository_name</code> label that Claude Code adds when
+          <code>OTEL_METRICS_INCLUDE_REPOSITORY</code> is set. Sessions that run outside a repository, such as a
+          memory plugin's observer, carry no label and drop out once a repository is picked, which is also the
+          easiest way to see what that observer costs.
+        </p>
+        <p>
+          The telemetry feeds two other tools. <code>/tether:ledger</code> fills the token ledger of a run report
+          from the recorded sessions, so the per-agent totals in a report are measured, not copied from completion
+          notices. And the eval runner reads a session's tokens and wall time from the same store when the stack is
+          up.
+        </p>
+        <div class="note note--pink">
+          <span class="note__tag">two things we got wrong</span>
+          <p>The dashboard's first version filtered on a <code>repository</code> label that does not exist; the metrics carry <code>vcs_repository_name</code>, <code>vcs_owner_name</code> and <code>vcs_repository_url_full</code>. And the dashboard file is bind-mounted into the container, but Grafana applied an edit only after a restart, so <code>/tether:telemetry down</code> and <code>up</code> are part of changing it.</p>
+        </div>
+      </section>
+
+      <section class="section" id="tasks">
+        <h2 class="section__title"><span class="num">04.</span> Frozen tasks against your repository</h2>
+        <p>
+          tether runs evals two ways, for two different questions. The first question is whether an agent still
+          does your work well after its prompt, its model or a skill changed.
+        </p>
+        <p>
+          <code>/tether:eval</code> reads the task files named in <code>harness.json</code>. Each is a small JSON
+          record with the agent to dispatch, a base commit, the paths a good change touches and the strings a good
+          answer must contain. The runner creates a throwaway git worktree at the base commit, symlinks what the
+          project needs, such as <code>node_modules</code>, dispatches the agent, runs the project's verify command,
+          and scores the result:
+        </p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Column</th><th>Source</th></tr></thead>
+            <tbody>
+              <tr><td>Pass</td><td>The project's verify command exits 0 in the worktree</td></tr>
+              <tr><td>Paths</td><td>How many of the expected paths the change touched</td></tr>
+              <tr><td>Caught</td><td>How many of the expected strings the agent's answer carries</td></tr>
+              <tr><td>Tokens, Wall time</td><td>From telemetry when the stack is up, else from the agent's own usage report</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>
+          The worktree never contains the tasks or the results folder, so the agent cannot read the expected
+          answers. Only a dry run is pre-approved; a real run asks first, because it costs one full agent run per
+          task.
+        </p>
+      </section>
+
+      <section class="section" id="cases">
+        <h2 class="section__title"><span class="num">05.</span> Cases against the plugin</h2>
+        <p>
+          The second question is whether the plugin's own agents do what their prompts promise, on any repository.
+          The sibling plugin, <code>tether-nx</code>, ships five cases in Claude Code's own
+          <code>claude plugin eval</code> format: a prompt, an optional <code>case.yaml</code> and a folder of
+          graders. Each case dispatches one agent against a small fixture over a neutral orders-and-invoices domain.
+          The graders are mostly regexes over the trace and tool checks, with one model-graded case.
+        </p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Case</th><th>What must happen</th></tr></thead>
+            <tbody>
+              <tr><td>Reviewer flags a root domain service</td><td>The conventions review marks the rule failed for a data-access service provided in root</td></tr>
+              <tr><td>Reviewer flags a feature import</td><td>The review marks the rule failed for a feature library importing another</td></tr>
+              <tr><td>Reviewer without a mode is blocked</td><td>A dispatch with no mode line gets a <code>Blocked:</code> reply and no table</td></tr>
+              <tr><td>Planner task headings</td><td>Every task is headed <code>### Task &lt;N&gt;: [tag] &lt;title&gt;</code>, one tag each, at most 12</td></tr>
+              <tr><td>Implementer blocks on open placement</td><td>A brief that leaves placement open gets a <code>Blocked:</code> report and no written file</td></tr>
+            </tbody>
+          </table>
+        </div>
+<pre><span class="pre__label">a cheap pass: one run per case, no baseline arm</span><code>claude plugin eval plugins/tether-nx --ablation none --runs 1 --no-publish</code></pre>
+        <p>
+          Drop the two flags and the runner does three runs per case with and without the plugin, which reports
+          what the plugin adds over the bare model. A day of eval runs, three runs per case and several reruns,
+          cost about $7.
+        </p>
+      </section>
+
+      <section class="section" id="taught">
+        <h2 class="section__title"><span class="num">06.</span> What the evals taught</h2>
+        <p>The first full run passed three cases of five, and two of the three passes were worth less than they looked.</p>
+        <div class="note note--pink">
+          <span class="note__tag">the fixture's fault</span>
+          <p>The case for "a data-access service must not be provided in root" used an HTTP client wrapper as its fixture, and the rule under test explicitly exempts those. The agent was right and the grader was wrong. The fixture became a stateful service.</p>
+        </div>
+        <div class="note note--pink">
+          <span class="note__tag">the runner's silence</span>
+          <p>A case can declare extra directories under <code>context.add_dirs</code>, and the runner grants the agent read access to them. It never tells the agent where they are: no path in the prompt, no placeholder, no announcement. The planner exhausted every read strategy it had and reported that the workspace did not exist. It took reading the Claude Code binary to see why.</p>
+        </div>
+        <div class="note note--green">
+          <span class="note__tag">how we solved it</span>
+          <p>A <code>scaffold_script</code> copies the fixture into the run's working directory, which the agent does know, and the case runs with <code>--scaffold</code>. The implementer case had the same shape and passed anyway, by blocking, which is what the brief asked for, but it was blocking because it could not see the code. With its fixture staged it still blocks, now for the right reason.</p>
+        </div>
+        <p>
+          Two rules for a memory plugin in the loop. The eval runner sets <code>CLAUDE_MEM_DISABLE_OBSERVATION</code>
+          and <code>CLAUDE_MEM_DISABLE_TOOL_HOOKS</code> for the agent under test, so a fixture run never becomes
+          project history. And the observer's sessions show in Grafana like any other, so pick a repository in the
+          dashboard before reading a cost figure.
+        </p>
+      </section>
+
+      <section class="section" id="score">
+        <h2 class="section__title"><span class="num">07.</span> Where this leaves the score</h2>
+        <p>
+          On the harness scorecard, ten areas of five points, telemetry sits under observability and is at five:
+          the stack runs, the dashboard splits by repository, and the ledger is filled from it. Evals are at four.
+          The fifth point is an eval for tether's own hooks, which needs a git repository as a fixture and Bash
+          allowed inside the eval sandbox, and is the next thing to build.
+        </p>
+        <p>
+          The scorecard itself, and the two days that moved it from 38 to 45, are in
+          <a href="/articles/two-memories-and-a-guard-rail/">Two memories and a guard rail</a>.
+        </p>
+        <blockquote class="pull"><p>Measure the agent, then measure the harness. Neither number is the one you expected.</p></blockquote>
+      </section>
+    </main>
+
+    <footer class="footer" id="contact">
+      <h2 class="footer__title">Use it, break it, tell me</h2>
+      <p class="footer__sub">The telemetry stack, the eval runner and the five cases ship with tether on GitHub.</p>
+      <a class="btn btn--primary" href="https://github.com/AndriiSiuta/tether" target="_blank" rel="noopener">tether on GitHub</a>
+      <a class="btn btn--ghost" href="/articles/two-memories-and-a-guard-rail/">Two memories and a guard rail</a>
+      <p class="footer__note mono">© 2026 Andrii Siuta · deployed on GitHub Pages</p>
+    </footer>
+  </div>
+</body>
+</html>
