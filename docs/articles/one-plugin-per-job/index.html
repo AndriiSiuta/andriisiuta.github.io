@@ -1,0 +1,507 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>One plugin per job: rules, workflow, guards — Andrii Siuta</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Splitting a Claude Code harness into three plugins with one job each, what we borrowed from other developers on GitHub and under which licences, and five changes to the spec-to-code workflow that came out of reading our own run reports.">
+  <meta property="og:title" content="One plugin per job: rules, workflow, guards">
+  <meta property="og:description" content="Splitting a Claude Code harness into three plugins with one job each, what we borrowed from other developers on GitHub and under which licences, and five changes to the spec-to-code workflow that came out of reading our own run reports.">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://andriisiuta.github.io/articles/one-plugin-per-job/">
+  <meta property="og:site_name" content="Andrii Siuta">
+  <meta property="og:image" content="https://andriisiuta.github.io/articles/one-plugin-per-job/og.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="One plugin per job: rules, workflow, guards">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="One plugin per job: rules, workflow, guards">
+  <meta name="twitter:description" content="Splitting a Claude Code harness into three plugins with one job each, what we borrowed from other developers on GitHub and under which licences, and five changes to the spec-to-code workflow that came out of reading our own run reports.">
+  <meta name="twitter:image" content="https://andriisiuta.github.io/articles/one-plugin-per-job/og.png">
+  <meta property="article:published_time" content="2026-10-13">
+  <meta property="article:author" content="Andrii Siuta">
+  <link rel="canonical" href="https://andriisiuta.github.io/articles/one-plugin-per-job/">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚡</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #06060f;
+      --bg-card: #0d0d1c;
+      --bg-card-hover: #12122a;
+      --border: #1e1e3a;
+      --text: #d6d6e7;
+      --text-dim: #8a8aa3;
+      --heading: #f4f4fb;
+      --pink: #ff3e7f;
+      --violet: #a855f7;
+      --red: #f0060b;
+      --green: #3ddc97;
+      --gradient: linear-gradient(90deg, #f0060b 0%, #cc26d5 55%, #7702ff 100%);
+      --gradient-soft: linear-gradient(90deg, #ff3e7f 0%, #a855f7 100%);
+      --font-body: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+      --font-head: 'Space Grotesk', var(--font-body);
+      --font-mono: 'JetBrains Mono', ui-monospace, 'Fira Code', monospace;
+      color-scheme: dark;
+    }
+
+    * { box-sizing: border-box; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      margin: 0;
+      background:
+        radial-gradient(ellipse 60% 40% at 70% -10%, rgba(119, 2, 255, 0.14), transparent),
+        radial-gradient(ellipse 50% 35% at 20% 10%, rgba(255, 62, 127, 0.1), transparent),
+        var(--bg);
+      color: var(--text);
+      font-family: var(--font-body);
+      font-size: 16px;
+      line-height: 1.65;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    ::selection { background: rgba(255, 62, 127, 0.35); color: #fff; }
+
+    .mono { font-family: var(--font-mono); }
+    .accent { color: var(--pink); }
+
+    a { color: var(--pink); text-decoration: none; }
+    a:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+    .nav {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px max(16px, calc(50vw - 506px));
+      backdrop-filter: blur(12px);
+      background: rgba(6, 6, 15, 0.7);
+      border-bottom: 1px solid rgba(30, 30, 58, 0.6);
+    }
+
+    .nav__brand { font-family: var(--font-head); font-weight: 700; font-size: 1.4rem; color: var(--heading); }
+    .nav__brand:hover { text-decoration: none; }
+    .nav__links { display: flex; gap: 22px; }
+    .nav__links a { color: var(--text-dim); font-size: 0.9rem; transition: color 0.2s; }
+    .nav__links a:hover { color: var(--pink); text-decoration: none; }
+
+    .wrap { max-width: 1060px; margin: 0 auto; padding: 0 16px; }
+    .article { max-width: 760px; margin: 0 auto; }
+
+    .hero { position: relative; padding: 80px 0 40px; }
+    .hero__glow { position: absolute; border-radius: 50%; filter: blur(90px); pointer-events: none; }
+    .hero__glow--pink { width: 380px; height: 380px; top: -60px; right: -80px; background: rgba(255, 62, 127, 0.16); }
+    .hero__glow--violet { width: 300px; height: 300px; bottom: -40px; left: -100px; background: rgba(119, 2, 255, 0.16); }
+    .hero__eyebrow { color: var(--pink); font-size: 0.95rem; margin: 0 0 14px; }
+    .cursor { animation: blink 1.1s step-end infinite; }
+    @keyframes blink { 50% { opacity: 0; } }
+
+    .hero__title {
+      font-family: var(--font-head);
+      font-size: clamp(2rem, 5.2vw, 3.4rem);
+      font-weight: 700;
+      line-height: 1.08;
+      margin: 0 0 20px;
+      background: var(--gradient);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      filter: drop-shadow(0 0 24px rgba(204, 38, 213, 0.25));
+    }
+
+    .hero__dek { color: var(--text-dim); font-size: 1.12rem; line-height: 1.6; margin: 0 0 26px; max-width: 700px; }
+    .hero__meta { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; color: var(--text-dim); font-size: 0.85rem; }
+
+    .chip {
+      font-family: var(--font-mono);
+      font-size: 0.74rem;
+      color: var(--text);
+      background: rgba(168, 85, 247, 0.1);
+      border: 1px solid rgba(168, 85, 247, 0.3);
+      border-radius: 999px;
+      padding: 3px 11px;
+    }
+
+    .metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin: 30px 0 10px; }
+
+    .metric {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 18px 14px;
+      text-align: center;
+      transition: border-color 0.25s, transform 0.25s;
+    }
+
+    .metric:hover { border-color: rgba(255, 62, 127, 0.5); transform: translateY(-3px); }
+
+    .metric__value {
+      display: block;
+      font-family: var(--font-head);
+      font-size: 1.55rem;
+      font-weight: 700;
+      line-height: 1.15;
+      letter-spacing: -0.01em;
+      background: var(--gradient-soft);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      white-space: nowrap;
+    }
+
+    .metric__label { display: block; color: var(--text-dim); font-size: 0.8rem; margin-top: 6px; }
+
+    .toc { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 20px 24px; margin: 36px 0 10px; }
+    .toc__title { font-family: var(--font-mono); font-size: 0.78rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.08em; margin: 0 0 12px; }
+    .toc ol { margin: 0; padding: 0; list-style: none; columns: 2; column-gap: 28px; }
+    .toc li { margin: 0 0 7px; break-inside: avoid; font-size: 0.93rem; }
+    .toc li a { color: var(--text); }
+    .toc li a:hover { color: var(--pink); text-decoration: none; }
+    .toc .n { font-family: var(--font-mono); color: var(--pink); font-size: 0.8rem; margin-right: 8px; }
+
+    .section { padding: 54px 0 4px; }
+
+    .section__title {
+      font-family: var(--font-head);
+      font-size: 1.65rem;
+      color: var(--heading);
+      margin: 0 0 24px;
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+      line-height: 1.25;
+    }
+
+    .section__title::after { content: ''; flex: 1; height: 1px; min-width: 24px; background: linear-gradient(90deg, var(--border), transparent); }
+    .section__title .num { font-family: var(--font-mono); color: var(--pink); font-size: 1rem; flex-shrink: 0; }
+
+    h3 { font-family: var(--font-head); color: var(--heading); font-size: 1.15rem; margin: 34px 0 12px; }
+
+    p { margin: 0 0 16px; }
+    .article ul, .article ol { margin: 0 0 18px; padding-left: 22px; }
+    .article li { margin-bottom: 7px; }
+    .article li::marker { color: var(--pink); }
+    strong { color: var(--heading); font-weight: 600; }
+
+    code {
+      font-family: var(--font-mono);
+      font-size: 0.86em;
+      background: rgba(168, 85, 247, 0.1);
+      border: 1px solid rgba(168, 85, 247, 0.22);
+      border-radius: 5px;
+      padding: 1px 6px;
+      color: var(--text);
+      word-break: break-word;
+    }
+
+    pre {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 18px 20px;
+      margin: 0 0 20px;
+      overflow-x: auto;
+      font-size: 0.82rem;
+      line-height: 1.6;
+    }
+
+    pre code { background: none; border: 0; padding: 0; font-size: inherit; color: var(--text); word-break: normal; }
+
+    .pre__label { display: block; font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-dim); margin: 0 0 10px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+
+    .c { color: var(--text-dim); }
+    .s { color: var(--pink); }
+    .k { color: var(--violet); }
+
+    .pull {
+      margin: 28px 0;
+      padding: 6px 0 6px 22px;
+      border-left: 3px solid transparent;
+      border-image: var(--gradient-soft) 1;
+      font-family: var(--font-head);
+      font-size: 1.2rem;
+      line-height: 1.45;
+      color: var(--heading);
+    }
+
+    .pull p { margin: 0; }
+
+    .note { border: 1px solid var(--border); border-left: 3px solid var(--violet); border-radius: 10px; padding: 14px 18px; background: var(--bg-card); margin: 0 0 20px; font-size: 0.95rem; }
+    .note p:last-child { margin: 0; }
+    .note__tag { display: inline-block; font-family: var(--font-mono); font-size: 0.72rem; color: var(--violet); border: 1px solid rgba(168, 85, 247, 0.5); border-radius: 999px; padding: 2px 9px; margin-bottom: 8px; }
+    .note--pink { border-left-color: var(--pink); }
+    .note--pink .note__tag { color: var(--pink); border-color: rgba(255, 62, 127, 0.5); }
+    .note--green { border-left-color: var(--green); }
+    .note--green .note__tag { color: var(--green); border-color: rgba(61, 220, 151, 0.5); }
+
+    .table-wrap { overflow-x: auto; margin: 0 0 22px; border: 1px solid var(--border); border-radius: 12px; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.9rem; min-width: 480px; }
+    th, td { padding: 10px 14px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--border); }
+    th { font-family: var(--font-mono); font-weight: 600; font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-dim); background: var(--bg-card); }
+    tr:last-child td { border-bottom: 0; }
+    tbody tr:hover td { background: rgba(168, 85, 247, 0.05); }
+    td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    td:first-child code { white-space: nowrap; }
+
+    figure { margin: 26px 0 24px; }
+    figure svg { display: block; width: 100%; max-width: 100%; height: auto; }
+    figure svg text { font-family: var(--font-mono); }
+    figcaption { color: var(--text-dim); font-size: 0.86rem; margin-top: 12px; line-height: 1.5; }
+
+    .footer { text-align: center; padding: 80px 0 50px; }
+    .footer__title { font-family: var(--font-head); font-size: clamp(1.4rem, 4vw, 2rem); color: var(--heading); margin: 0 0 12px; }
+    .footer__sub { color: var(--text-dim); max-width: 520px; margin: 0 auto 26px; }
+
+    .btn { display: inline-block; padding: 12px 26px; border-radius: 8px; font-weight: 600; font-size: 0.95rem; transition: transform 0.2s, box-shadow 0.2s; }
+    .btn:hover { text-decoration: none; transform: translateY(-2px); }
+    .btn--primary { background: var(--gradient-soft); color: #fff; box-shadow: 0 0 24px rgba(255, 62, 127, 0.35); }
+    .btn--primary:hover { box-shadow: 0 0 36px rgba(168, 85, 247, 0.5); }
+    .btn--ghost { border: 1px solid var(--border); color: var(--text); margin-left: 10px; }
+    .btn--ghost:hover { border-color: var(--pink); color: var(--pink); }
+    .footer__note { margin-top: 40px; color: var(--text-dim); font-size: 0.75rem; opacity: 0.7; }
+
+    @media (max-width: 640px) {
+      .hero { padding-top: 56px; }
+      .nav__links { gap: 14px; }
+      .nav__links a { font-size: 0.8rem; }
+      .metrics { grid-template-columns: repeat(2, 1fr); }
+      .metric__value { font-size: 1.3rem; }
+      .toc ol { columns: 1; }
+      figure { overflow-x: auto; }
+      figure svg { min-width: 640px; }
+      .pull { font-size: 1.05rem; }
+      .btn--ghost { margin-left: 0; margin-top: 10px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      .cursor { animation: none; }
+      .metric, .btn { transition: none; }
+    }
+    .tree { font-family: var(--font-mono); font-size: 0.82rem; line-height: 1.55; }
+    .tree .d { color: var(--violet); }
+    .tree .f { color: var(--text); }
+    .tree .x { color: var(--text-dim); }
+    .two { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .two pre { margin: 0 0 20px; }
+    @media (max-width: 640px) { .two { grid-template-columns: 1fr; } }
+    .sources { font-size: 0.86rem; color: var(--text-dim); padding-left: 22px; }
+    .sources li { margin-bottom: 6px; word-break: break-word; }
+    sup a { font-family: var(--font-mono); font-size: 0.7rem; }
+  </style>
+</head>
+<body>
+  <nav class="nav">
+    <a class="nav__brand" href="/">AS<span class="accent">.</span></a>
+    <div class="nav__links">
+      <a href="/">CV</a>
+      <a href="/articles/">Writing</a>
+      <a href="https://github.com/AndriiSiuta" target="_blank" rel="noopener">GitHub</a>
+      <a href="https://www.linkedin.com/in/andrii-siuta/" target="_blank" rel="noopener">LinkedIn</a>
+    </div>
+  </nav>
+
+  <div class="wrap">
+    <header class="hero">
+      <div class="hero__glow hero__glow--pink"></div>
+      <div class="hero__glow hero__glow--violet"></div>
+      <p class="hero__eyebrow mono">$ claude plugin install tether-web@tether --scope local<span class="cursor">▊</span></p>
+      <h1 class="hero__title">One plugin per job: rules, workflow, guards</h1>
+      <p class="hero__dek">The harness around my Claude Code sessions had grown into one plugin that knew the Angular rules, ran the agents and guarded git, and a second copy of the agents living in the repository it came from. One day to split it into three plugins with one job each, borrow what other developers had already published, and fix the five things our own run reports kept complaining about.</p>
+      <div class="hero__meta">
+        <span>Andrii Siuta</span>
+        <span>·</span>
+        <span>October 2026</span>
+        <span>·</span>
+        <span>~7 min read</span>
+        <span class="chip">Claude Code</span>
+        <span class="chip">tether</span>
+        <span class="chip">Angular</span>
+        <span class="chip">Nx</span>
+      </div>
+      <div class="metrics">
+        <div class="metric"><span class="metric__value">3</span><span class="metric__label">plugins, one job each</span></div>
+        <div class="metric"><span class="metric__value">10</span><span class="metric__label">workflow agents</span></div>
+        <div class="metric"><span class="metric__value">9</span><span class="metric__label">process skills</span></div>
+        <div class="metric"><span class="metric__value">5</span><span class="metric__label">parallel implementers</span></div>
+        <div class="metric"><span class="metric__value">254</span><span class="metric__label">tests green</span></div>
+        <div class="metric"><span class="metric__value">6</span><span class="metric__label">eval cases</span></div>
+      </div>
+      <p>
+        <a class="btn btn--primary" href="https://github.com/AndriiSiuta/tether" target="_blank" rel="noopener">github.com/AndriiSiuta/tether</a>
+      </p>
+      <nav class="toc" aria-label="Contents">
+        <p class="toc__title">Contents</p>
+        <ol>
+          <li><a href="#why"><span class="n">01</span>The plugin that already existed</a></li>
+          <li><a href="#three"><span class="n">02</span>Three plugins, one job each</a></li>
+          <li><a href="#borrowed"><span class="n">03</span>What we borrowed, and under which licence</a></li>
+          <li><a href="#workflow"><span class="n">04</span>Five changes to the workflow</a></li>
+          <li><a href="#build"><span class="n">05</span>Built by the agents it describes</a></li>
+          <li><a href="#open"><span class="n">06</span>What is still open</a></li>
+        </ol>
+      </nav>
+    </header>
+
+    <main class="article">
+      <section class="section" id="why">
+        <h2 class="section__title"><span class="num">01.</span> The plugin that already existed</h2>
+        <p>
+          The ask was simple: a narrow plugin for web, Angular and Nx, reusing the skills and agents other
+          developers publish on GitHub where they are good, and a better spec-to-code pipeline. Before searching
+          anywhere I listed what was already on the machine, and the first finding was embarrassing. The narrow
+          plugin mostly existed. <a href="/articles/tether/">tether-nx</a> had six agents, nine skills, rule ids and
+          five eval cases, extracted from a production workspace. That workspace did not use it. It ran eight local
+          copies of the agents instead, tuned to its tracker and its review bar, and the plugin had never been
+          exercised on its own source repository.
+        </p>
+        <p>
+          The second finding was that Nx was already covered. The official <code>nx</code> plugin from the Nx team
+          ships seven skills, workspace exploration, generators, task running, CI monitoring, and was installed at
+          project scope. Any plugin of mine that described Nx in prose would be duplicating a maintained one.
+        </p>
+        <p>
+          The third was that the Angular layer was a mix of three sources nobody had written down: Google's
+          <code>angular-developer</code> skill with forty-one reference files, a SignalStore and a PrimeNG rule set
+          from a community repository that had since been archived, and my own placement and performance skills,
+          two of them vendored from another developer under MIT.
+        </p>
+        <blockquote class="pull"><p>Before you build the narrow plugin, check whether you are the person who already built it and switched it off.</p></blockquote>
+      </section>
+
+      <section class="section" id="three">
+        <h2 class="section__title"><span class="num">02.</span> Three plugins, one job each</h2>
+        <p>
+          The decision was a split, not a new name. One marketplace, three plugins, each answering one question.
+        </p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Plugin</th><th>Question it answers</th><th>Ships</th></tr></thead>
+            <tbody>
+              <tr><td><code>tether</code></td><td>What may the agent never do?</td><td>Hooks: a git guard, an MCP write guard, untrusted-input reminders, report and word caps, telemetry, an eval runner.</td></tr>
+              <tr><td><code>tether-nx</code></td><td>How is Angular code written here?</td><td>Rules only: library layers, providers, signals, components, SignalStore, PrimeNG, performance, accessibility. Stable rule ids a project overrides in one file.</td></tr>
+              <tr><td><code>tether-web</code></td><td>How does a ticket become a merged pull request?</td><td>Ten agents and nine process skills, from investigator to pr-creator, driven by a rules file that names the tracker, the PR host, the preview URL and the verify command.</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>
+          <code>tether-web</code> declares <code>tether-nx</code> and the official <code>nx</code> plugin as
+          dependencies in its manifest, and its agents preload the rules skills by their plugin name. Installing it
+          pulls the other two in. The rules plugin lost its agents and became a library of conventions; the workflow
+          plugin became the only place an agent is defined.
+        </p>
+        <p>
+          The agents got model tiers at the same time. The investigator, spec-writer and planner inherit the session
+          model, so planning runs on whatever the person chose. The two implementers and the correctness reviewer run
+          on Opus. The plan validator, the conventions reviewer, the UI checker and the PR creator run on Sonnet,
+          because checking a table against a list of ids is not where the expensive model earns its price.
+        </p>
+      </section>
+
+      <section class="section" id="borrowed">
+        <h2 class="section__title"><span class="num">03.</span> What we borrowed, and under which licence</h2>
+        <p>
+          A background agent spent nine minutes and a hundred tool calls on GitHub, angular.dev, nx.dev and the Claude
+          Code docs, with one rule: primary sources only, a URL per claim, and the licence of every repository named
+          before it is recommended. The result sorted into three piles.
+        </p>
+        <ul>
+          <li><strong>Reuse as-is.</strong> The official Nx plugin, as a dependency. Google's <code>angular-developer</code>, linked rather than copied, because its licence is only stated in a frontmatter line. Anthropic's <code>frontend-design</code> under Apache-2.0, for a screen with no design frame. Microsoft's <code>playwright-cli</code>, Apache-2.0, to drive a browser from a reviewer instead of leaving a click-through under <em>deferred</em>.</li>
+          <li><strong>Fork and trim.</strong> The archived SignalStore and PrimeNG rule tables, now carried as <code>ng-signalstore</code> and <code>ng-primeng</code> with their MIT notice and our async shape appended. A Playwright best-practices skill, keeping locators, assertions, fixtures and flakiness and dropping the rest. One idea from each of the spec-driven tools, below.</li>
+          <li><strong>Write ourselves.</strong> A Jest and Spectator recipe, because no public skill has real content for that pair. A Tailwind 3 token skill, because every public Tailwind skill targets v4. The Jira and Azure DevOps stages. The verify script.</li>
+        </ul>
+        <div class="note note--pink">
+          <span class="note__tag">skipped</span>
+          <p>The Angular CLI's MCP server reads <code>angular.json</code>, which an Nx workspace does not have. A well-known agent collection has breadth and no Angular. Anthropic's web-testing skill is Python. The spec-driven development tools, seven of them, all do what the pipeline here already does, with GitHub where we have Jira and Azure DevOps.</p>
+        </div>
+        <p>
+          That last line is the useful one. None of spec-kit, superpowers, Pimzino, ccpm, BMAD, agent-os or OpenSpec
+          was worth adopting as a tool. Four of their ideas were worth adopting as changes.
+        </p>
+      </section>
+
+      <section class="section" id="workflow">
+        <h2 class="section__title"><span class="num">04.</span> Five changes to the workflow</h2>
+        <p>
+          Each change answers a line that appears in our last four run reports, the documents every branch ends with.
+          The reports carry a rulings list and a ledger per agent, so the frictions were already written down; nobody
+          had read them as a to-do list.
+        </p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>What the run reports said</th><th>Change</th><th>Borrowed from</th></tr></thead>
+            <tbody>
+              <tr><td>The fix-round cap of two was reached; review found defects the plan already implied.</td><td>A read-only <strong>plan validator</strong> between the planner and the first implementer: every spec decision has a task, every task cites real decision ids, the waves follow from the fields. It ends with <code>Verdict: Dispatch</code> or <code>Verdict: Revise</code>.</td><td>Pimzino's spec validator</td></tr>
+              <tr><td>Waves were decided by reading prose; a shared barrel was lifted out by hand each time.</td><td>Every plan task carries <code>touches</code>, <code>conflicts_with</code>, <code>spec</code> and <code>checks</code> fields. The dispatcher derives the waves and the shared-file commit from them.</td><td>ccpm's task fields</td></tr>
+              <tr><td>The review bar was restated in four places.</td><td>One <strong>constitution</strong> skill with stable <code>CON-n</code> ids, preloaded by the planner, the validator and both reviewers. A project overrides an id in its own file, never silently.</td><td>spec-kit's constitution</td></tr>
+              <tr><td>A reviewer claim was later refuted; the ledger already had a column for it.</td><td>Every review finding carries an <strong>evidence</strong> cell, a path and line plus the command or spec that shows it. A finding without evidence is refuted by the dispatcher without discussion.</td><td>ours</td></tr>
+              <tr><td>The same follow-ups were re-listed across three pull requests.</td><td>A dated <strong>follow-ups register</strong> the docs-syncing step appends to and the investigator reads at the start of the next ticket in the same area.</td><td>OpenSpec's living deltas, scaled down</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <blockquote class="pull"><p>Adopt the idea, not the tool. Every spec-driven framework we read is a prompt pack plus a tracker we do not use.</p></blockquote>
+      </section>
+
+      <section class="section" id="build">
+        <h2 class="section__title"><span class="num">05.</span> Built by the agents it describes</h2>
+        <p>
+          The split was built the way the plugin says work should be built: a spec, then five Opus implementers in
+          parallel on disjoint paths of one working tree, each committing from a pathspec, then two more for the
+          docs and the evals. Fourteen commits, all tests green, the marketplace validator passing.
+        </p>
+        <p>
+          Three of the five first-wave implementers stopped short and reported <code>Blocked:</code> instead of
+          committing. That was the harness working.
+        </p>
+        <div class="note note--pink">
+          <span class="note__tag">challenge</span>
+          <p>The repository's frontmatter test rejected any agent that preloads a skill from another plugin. The new workflow agents preload the rules plugin's skills by design. Two implementers wrote their files, ran the suite, saw red, and held the commit, as their brief said to.</p>
+        </div>
+        <div class="note note--green">
+          <span class="note__tag">how we solved it</span>
+          <p>The fix went into the checker, not the content: a prefix listed in the plugin manifest's <code>dependencies</code> now resolves against that plugin's skills folder, with a test for the case. The same hour, the neutrality scan flagged <code>@playwright</code> and <code>@ngneat</code> as unknown npm scopes and a hex colour as a ticket number. Public scopes joined the allowlist; the colour changed.</p>
+        </div>
+        <p>
+          The pattern repeated enough to be the lesson of the day. A check that pushes back on a correct change is
+          not an obstacle to route around; it is the place the repository's assumptions are written down. Each time,
+          the implementer reported the failing line with the file and the reason, and the dispatcher decided whether
+          the check or the change was wrong. In four cases the check was.
+        </p>
+        <p>
+          The one thing the agents could not do was fetch. The sandbox has no outbound network, so vendoring two
+          skills verbatim with their licence files waits for a human to run two <code>git clone</code> commands. An
+          agent that summarises a licence through a fetch tool is not a copy.
+        </p>
+      </section>
+
+      <section class="section" id="open">
+        <h2 class="section__title"><span class="num">06.</span> What is still open</h2>
+        <ul>
+          <li><strong>The dogfood run.</strong> One small ticket through <code>tether-web:*</code> on the workspace the rules came from, compared against the local agents, before those copies are retired. Until then both sets are installed side by side.</li>
+          <li><strong>The two vendored skills</strong> and the <code>playwright-cli</code> install, which need the clones above.</li>
+          <li><strong>A real run of the two new eval cases.</strong> They were checked against hand-written good and bad outputs, which is not the same as a model.</li>
+          <li><strong>A release tag.</strong> The root README already pins it; cutting it is a decision, not a build step.</li>
+        </ul>
+        <p>
+          The research note, the spec and the run report with its token ledger sit beside the code, dated. The
+          plugin is on GitHub with the changelog that lists what moved and what broke.
+        </p>
+        <blockquote class="pull"><p>Rules in one plugin, workflow in another, guards in a third. When one of them is wrong, you know which file to open.</p></blockquote>
+      </section>
+    </main>
+
+    <footer class="footer" id="contact">
+      <h2 class="footer__title">Use it, break it, tell me</h2>
+      <p class="footer__sub">tether, tether-nx and tether-web are on GitHub with the changelog, the evals and the earlier articles. If a rule does not fit your workspace, that is an issue, not a fork.</p>
+      <a class="btn btn--primary" href="https://github.com/AndriiSiuta/tether" target="_blank" rel="noopener">tether on GitHub</a>
+      <a class="btn btn--ghost" href="/articles/two-memories-and-a-guard-rail/">Two memories and a guard rail</a>
+      <p class="footer__note mono">© 2026 Andrii Siuta · deployed on GitHub Pages</p>
+    </footer>
+  </div>
+</body>
+</html>
